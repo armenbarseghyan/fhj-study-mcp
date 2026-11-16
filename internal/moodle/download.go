@@ -158,8 +158,9 @@ func (c *Client) FetchFile(ctx context.Context, rawURL string, maxBytes int64) (
 }
 
 // Download fetches a pluginfile URL and stores it under dest.
-// dest is a directory when it exists as one or ends with a path separator;
-// otherwise it is the full target file path. The write is atomic.
+// dest is a directory when it exists as one, ends with a path separator, or
+// does not exist and has no extension; otherwise it is the full target file
+// path. The write is atomic.
 func (c *Client) Download(ctx context.Context, rawURL, dest string) (Downloaded, error) {
 	if dest == "" {
 		if _, err := c.ToWebserviceURL(rawURL); err != nil {
@@ -331,6 +332,10 @@ func resolveTarget(dest, name string) (string, error) {
 		return "", err
 	}
 	if fi, err := os.Stat(dest); err == nil && fi.IsDir() {
+		isDir = true
+	} else if err != nil && filepath.Ext(dest) == "" {
+		// A new path without an extension is a folder to create, not a file
+		// named like one ("~/Desktop/pdp" must not become a file "pdp").
 		isDir = true
 	}
 	var target string

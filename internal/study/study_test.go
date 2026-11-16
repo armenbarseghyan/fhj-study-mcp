@@ -9,11 +9,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/armenbarseghyan/moodle-mcp/internal/extract"
-	"github.com/armenbarseghyan/moodle-mcp/internal/moodle"
-	"github.com/armenbarseghyan/moodle-mcp/internal/moodletest"
-	"github.com/armenbarseghyan/moodle-mcp/internal/study"
-	"github.com/armenbarseghyan/moodle-mcp/internal/textfmt"
+	"github.com/armenbarseghyan/fhj-study-mcp/internal/extract"
+	"github.com/armenbarseghyan/fhj-study-mcp/internal/moodle"
+	"github.com/armenbarseghyan/fhj-study-mcp/internal/moodletest"
+	"github.com/armenbarseghyan/fhj-study-mcp/internal/study"
+	"github.com/armenbarseghyan/fhj-study-mcp/internal/textfmt"
 )
 
 const base = "https://moodle.example.test"
@@ -222,13 +222,16 @@ func TestMergeDeadlines(t *testing.T) {
 	t.Parallel()
 	refs := map[int]study.CourseRef{1: {ID: 1, Label: "Programming"}, 2: {ID: 2, Label: "Unix"}}
 	type want struct {
-		key     study.DeadlineKey
-		title   string
-		due     string
-		sources int
-		status  study.Submission
-		course  string
+		key      study.DeadlineKey
+		instance int
+		title    string
+		due      string
+		sources  int
+		status   study.Submission
+		course   string
 	}
+	// Real Moodle: an event's "instance" is the cmid (9501), an assignment has
+	// id 501 and cmid 9501.
 	tests := []struct {
 		name    string
 		events  []moodle.Event
@@ -236,23 +239,32 @@ func TestMergeDeadlines(t *testing.T) {
 		want    []want
 	}{
 		{
-			name:    "same assignment from both sources is merged",
-			events:  []moodle.Event{ev("assign", 501, "2026-10-07 17:15", 1)},
+			name:    "same assignment from both sources is merged by cmid",
+			events:  []moodle.Event{ev("assign", 9501, "2026-10-07 17:15", 1)},
 			assigns: []moodle.CourseAssignments{{ID: 1, Assignments: []moodle.Assignment{asg(501, 9501, 1, "Homework R1", "2026-10-07 17:15")}}},
-			want: []want{{study.DeadlineKey{Module: "assign", Instance: 501}, "Homework R1", "2026-10-07 17:15",
+			want: []want{{study.DeadlineKey{Module: "assign", CMID: 9501}, 501, "Homework R1", "2026-10-07 17:15",
 				study.FromCalendar | study.FromAssignments, study.SubmissionUnknown, "Programming"}},
 		},
 		{
-			name:    "calendar time wins (user override)",
-			events:  []moodle.Event{ev("assign", 501, "2026-10-09 12:00", 1)},
+			name:    "event instance equal to an assignment id is not that assignment",
+			events:  []moodle.Event{ev("assign", 501, "2026-10-05 10:00", 1)},
 			assigns: []moodle.CourseAssignments{{ID: 1, Assignments: []moodle.Assignment{asg(501, 9501, 1, "Homework R1", "2026-10-07 17:15")}}},
-			want: []want{{study.DeadlineKey{Module: "assign", Instance: 501}, "Homework R1", "2026-10-09 12:00",
+			want: []want{
+				{study.DeadlineKey{Module: "assign", CMID: 501}, 0, "Event assign", "2026-10-05 10:00", study.FromCalendar, study.SubmissionUnknown, "Programming"},
+				{study.DeadlineKey{Module: "assign", CMID: 9501}, 501, "Homework R1", "2026-10-07 17:15", study.FromAssignments, study.SubmissionUnknown, "Programming"},
+			},
+		},
+		{
+			name:    "calendar time wins (user override)",
+			events:  []moodle.Event{ev("assign", 9501, "2026-10-09 12:00", 1)},
+			assigns: []moodle.CourseAssignments{{ID: 1, Assignments: []moodle.Assignment{asg(501, 9501, 1, "Homework R1", "2026-10-07 17:15")}}},
+			want: []want{{study.DeadlineKey{Module: "assign", CMID: 9501}, 501, "Homework R1", "2026-10-09 12:00",
 				study.FromCalendar | study.FromAssignments, study.SubmissionUnknown, "Programming"}},
 		},
 		{
 			name:    "assignment without event is kept (event vanishes after submission)",
 			assigns: []moodle.CourseAssignments{{ID: 1, Assignments: []moodle.Assignment{asg(503, 9503, 1, "Homework R2", "2026-10-10 10:00")}}},
-			want: []want{{study.DeadlineKey{Module: "assign", Instance: 503}, "Homework R2", "2026-10-10 10:00",
+			want: []want{{study.DeadlineKey{Module: "assign", CMID: 9503}, 503, "Homework R2", "2026-10-10 10:00",
 				study.FromAssignments, study.SubmissionUnknown, "Programming"}},
 		},
 		{
@@ -261,41 +273,62 @@ func TestMergeDeadlines(t *testing.T) {
 			want:    nil,
 		},
 		{
-			name:   "quiz from calendar only uses activity name",
-			events: []moodle.Event{ev("quiz", 77, "2026-10-05 23:59", 2)},
-			want: []want{{study.DeadlineKey{Module: "quiz", Instance: 77}, "Event quiz", "2026-10-05 23:59",
+			name:   "quiz from calendar only uses activity name; its id is not known yet",
+			events: []moodle.Event{ev("quiz", 9077, "2026-10-05 23:59", 2)},
+			want: []want{{study.DeadlineKey{Module: "quiz", CMID: 9077}, 0, "Event quiz", "2026-10-05 23:59",
 				study.FromCalendar, study.SubmissionUnknown, "Unix"}},
 		},
 		{
-			name:    "same instance id in different modules is not merged",
-			events:  []moodle.Event{ev("quiz", 501, "2026-10-05 23:59", 2)},
+			name:    "same cmid in different modules is not merged",
+			events:  []moodle.Event{ev("quiz", 9501, "2026-10-05 23:59", 2)},
 			assigns: []moodle.CourseAssignments{{ID: 1, Assignments: []moodle.Assignment{asg(501, 9501, 1, "Homework R1", "2026-10-07 17:15")}}},
 			want: []want{
-				{study.DeadlineKey{Module: "quiz", Instance: 501}, "Event quiz", "2026-10-05 23:59", study.FromCalendar, study.SubmissionUnknown, "Unix"},
-				{study.DeadlineKey{Module: "assign", Instance: 501}, "Homework R1", "2026-10-07 17:15", study.FromAssignments, study.SubmissionUnknown, "Programming"},
+				{study.DeadlineKey{Module: "quiz", CMID: 9501}, 0, "Event quiz", "2026-10-05 23:59", study.FromCalendar, study.SubmissionUnknown, "Unix"},
+				{study.DeadlineKey{Module: "assign", CMID: 9501}, 501, "Homework R1", "2026-10-07 17:15", study.FromAssignments, study.SubmissionUnknown, "Programming"},
 			},
 		},
 		{
 			name: "teacher grading deadline ignored",
 			events: func() []moodle.Event {
-				e := ev("assign", 501, "2026-10-14 12:00", 1)
+				e := ev("assign", 9501, "2026-10-14 12:00", 1)
 				e.EventType = "gradingdue"
 				return []moodle.Event{e}
 			}(),
 			want: nil,
 		},
 		{
+			name: "a quiz's opening is not its deadline; the close time is",
+			events: func() []moodle.Event {
+				open, closes := ev("quiz", 9077, "2026-10-03 09:00", 2), ev("quiz", 9077, "2026-10-10 23:59", 2)
+				open.EventType, closes.EventType = "open", "close"
+				return []moodle.Event{open, closes}
+			}(),
+			want: []want{{study.DeadlineKey{Module: "quiz", CMID: 9077}, 0, "Event quiz", "2026-10-10 23:59",
+				study.FromCalendar, study.SubmissionUnknown, "Unix"}},
+		},
+		{
+			name: "expected completion does not replace the due date",
+			events: func() []moodle.Event {
+				e := ev("assign", 9501, "2026-10-08 12:00", 1)
+				e.EventType = "expectcompletionon"
+				return []moodle.Event{e}
+			}(),
+			assigns: []moodle.CourseAssignments{{ID: 1, Assignments: []moodle.Assignment{asg(501, 9501, 1, "Homework R1", "2026-10-07 17:15")}}},
+			want: []want{{study.DeadlineKey{Module: "assign", CMID: 9501}, 501, "Homework R1", "2026-10-07 17:15",
+				study.FromCalendar | study.FromAssignments, study.SubmissionUnknown, "Programming"}},
+		},
+		{
 			name:   "unknown course falls back to event course name",
 			events: []moodle.Event{ev("quiz", 5, "2026-10-05 10:00", 99)},
-			want: []want{{study.DeadlineKey{Module: "quiz", Instance: 5}, "Event quiz", "2026-10-05 10:00",
+			want: []want{{study.DeadlineKey{Module: "quiz", CMID: 5}, 0, "Event quiz", "2026-10-05 10:00",
 				study.FromCalendar, study.SubmissionUnknown, "Course 99"}},
 		},
 		{
 			name:   "sorted by due date",
 			events: []moodle.Event{ev("quiz", 2, "2026-10-09 10:00", 2), ev("quiz", 1, "2026-10-03 10:00", 2)},
 			want: []want{
-				{study.DeadlineKey{Module: "quiz", Instance: 1}, "Event quiz", "2026-10-03 10:00", study.FromCalendar, study.SubmissionUnknown, "Unix"},
-				{study.DeadlineKey{Module: "quiz", Instance: 2}, "Event quiz", "2026-10-09 10:00", study.FromCalendar, study.SubmissionUnknown, "Unix"},
+				{study.DeadlineKey{Module: "quiz", CMID: 1}, 0, "Event quiz", "2026-10-03 10:00", study.FromCalendar, study.SubmissionUnknown, "Unix"},
+				{study.DeadlineKey{Module: "quiz", CMID: 2}, 0, "Event quiz", "2026-10-09 10:00", study.FromCalendar, study.SubmissionUnknown, "Unix"},
 			},
 		},
 	}
@@ -308,8 +341,8 @@ func TestMergeDeadlines(t *testing.T) {
 			}
 			for i, w := range tt.want {
 				g := got[i]
-				if g.Key != w.key || g.Title != w.title || !g.Due.Equal(vie(w.due)) || g.Sources != w.sources ||
-					g.Status != w.status || g.Course.Label != w.course || g.URL == "" {
+				if g.Key != w.key || g.Instance != w.instance || g.Title != w.title || !g.Due.Equal(vie(w.due)) ||
+					g.Sources != w.sources || g.Status != w.status || g.Course.Label != w.course || g.URL == "" {
 					t.Errorf("[%d] got %+v\nwant %+v", i, g, w)
 				}
 			}

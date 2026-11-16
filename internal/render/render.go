@@ -7,8 +7,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/armenbarseghyan/moodle-mcp/internal/study"
-	"github.com/armenbarseghyan/moodle-mcp/internal/textfmt"
+	"github.com/armenbarseghyan/fhj-study-mcp/internal/study"
+	"github.com/armenbarseghyan/fhj-study-mcp/internal/textfmt"
 )
 
 const (
@@ -476,7 +476,7 @@ func WhoAmI(r study.WhoAmIResult, version string) string {
 		d.line("- File download via the API: **disabled** on the site")
 	}
 	if version != "" {
-		d.line("- moodle-mcp %s", version)
+		d.line("- fhj-study-mcp %s", version)
 	}
 	return d.finish(time.Time{}, time.Time{})
 }

@@ -11,9 +11,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/armenbarseghyan/moodle-mcp/internal/moodle"
-	"github.com/armenbarseghyan/moodle-mcp/internal/study"
-	"github.com/armenbarseghyan/moodle-mcp/internal/textfmt"
+	"github.com/armenbarseghyan/fhj-study-mcp/internal/moodle"
+	"github.com/armenbarseghyan/fhj-study-mcp/internal/study"
+	"github.com/armenbarseghyan/fhj-study-mcp/internal/textfmt"
+	"github.com/armenbarseghyan/fhj-study-mcp/internal/timetable"
 )
 
 // MaxChars bounds one tool answer. Lines beyond it are summarised.
@@ -137,7 +138,7 @@ func ErrorText(err error) string {
 		return ""
 	case errors.Is(err, moodle.ErrInvalidToken):
 		return p.Sprintf("The Moodle token is invalid or revoked. Get a new one by running ./setup.sh " +
-			"(setup.ps1 on Windows) in the moodle-mcp folder again; see docs/STUDENT-SETUP.md.")
+			"(setup.ps1 on Windows) in the fhj-study-mcp folder again; see docs/STUDENT-SETUP.md.")
 	case errors.Is(err, moodle.ErrAccessDenied):
 		return p.Sprintf("Moodle refused the call (access control): the function is not part of the token's service or is disabled for your role.")
 	case errors.Is(err, moodle.ErrNotAccessible):
@@ -149,6 +150,14 @@ func ErrorText(err error) string {
 	case errors.Is(err, moodle.ErrForeignURL):
 		return p.Sprintf("The link does not point to a file of this Moodle (expected …/pluginfile.php/…). " +
 			"The server does not download from other sites, so the token never leaves.")
+	case errors.Is(err, moodle.ErrDestNotAllowed):
+		return p.Sprintf("Files are saved only into the download folder or into Desktop, Documents or Downloads " +
+			"(not into hidden or PowerShell folders). Leave dest empty for the download folder.")
+	case errors.Is(err, timetable.ErrNoQuery):
+		return p.Sprintf("No timetable search is set. Pass query (programme code and year, e.g. \"dat26\") or set FHJ_TIMETABLE " +
+			"in the server's environment (the setup asks for it).")
+	case errors.Is(err, timetable.ErrUnavailable):
+		return p.Sprintf("The FH timetable (almaty.fh-joanneum.at) is not available right now: %s", err.Error())
 	case errors.Is(err, moodle.ErrUnexpectedResponse):
 		return p.Sprintf("Moodle returned a non-JSON response — maintenance or a proxy problem.")
 	case errors.Is(err, context.DeadlineExceeded):

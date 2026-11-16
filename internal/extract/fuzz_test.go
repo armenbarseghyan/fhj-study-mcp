@@ -4,7 +4,7 @@ import (
 	"testing"
 	"unicode/utf8"
 
-	"github.com/armenbarseghyan/moodle-mcp/internal/extract"
+	"github.com/armenbarseghyan/fhj-study-mcp/internal/extract"
 )
 
 // FuzzText feeds arbitrary bytes to every extractor: course files come from

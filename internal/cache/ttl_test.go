@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/armenbarseghyan/moodle-mcp/internal/cache"
+	"github.com/armenbarseghyan/fhj-study-mcp/internal/cache"
 )
 
 type fakeClock struct {

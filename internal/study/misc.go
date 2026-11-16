@@ -4,7 +4,7 @@ import (
 	"context"
 	"strings"
 
-	"github.com/armenbarseghyan/moodle-mcp/internal/moodle"
+	"github.com/armenbarseghyan/fhj-study-mcp/internal/moodle"
 )
 
 // DownloadResult answers moodle_download.
@@ -20,6 +20,9 @@ type DownloadResult struct {
 func (s *Service) Download(ctx context.Context, fileURL, dest string) (DownloadResult, error) {
 	if strings.TrimSpace(dest) == "" {
 		dest = s.downloadDir + "/"
+	}
+	if err := moodle.CheckDest(dest, s.downloadDir); err != nil {
+		return DownloadResult{}, err
 	}
 	d, err := s.src.Download(ctx, fileURL, dest)
 	if err != nil {

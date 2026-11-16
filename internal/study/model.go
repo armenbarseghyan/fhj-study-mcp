@@ -5,7 +5,7 @@ import (
 	"time"
 )
 
-// Domain models. Times are absolute instants (rendered in Vienna by render),
+// Domain models. Times are absolute instants (rendered in the display zone by render),
 // strings are plain text without HTML, and empty means "not shown".
 
 // CourseRef identifies a course in other models.
@@ -55,9 +55,11 @@ const (
 func (s Submission) Done() bool { return s == SubmissionSubmitted || s == SubmissionGraded }
 
 // DeadlineKey identifies an activity across calendar events and assignments.
+// It uses the course-module id: that is what a calendar event's "instance"
+// field holds, and what an assignment reports as "cmid".
 type DeadlineKey struct {
-	Module   string // "assign", "quiz", ...
-	Instance int
+	Module string // "assign", "quiz", ...
+	CMID   int
 }
 
 // Source flags for a merged deadline.
@@ -68,13 +70,14 @@ const (
 
 // Deadline is one merged, deduplicated deadline.
 type Deadline struct {
-	Key     DeadlineKey
-	Course  CourseRef
-	Title   string
-	URL     string
-	Due     time.Time
-	Status  Submission
-	Sources int
+	Key      DeadlineKey
+	Instance int // activity id (assignid, quizid); 0 until known
+	Course   CourseRef
+	Title    string
+	URL      string
+	Due      time.Time
+	Status   Submission
+	Sources  int
 }
 
 // Section is a course section with its visible items.

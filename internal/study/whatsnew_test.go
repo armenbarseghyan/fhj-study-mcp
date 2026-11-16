@@ -4,7 +4,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/armenbarseghyan/moodle-mcp/internal/study"
+	"github.com/armenbarseghyan/fhj-study-mcp/internal/study"
 )
 
 func TestNewMaterials(t *testing.T) {

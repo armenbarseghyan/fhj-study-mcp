@@ -10,7 +10,7 @@ import (
 
 	"golang.org/x/sync/errgroup"
 
-	"github.com/armenbarseghyan/moodle-mcp/internal/moodle"
+	"github.com/armenbarseghyan/fhj-study-mcp/internal/moodle"
 )
 
 const fanOutLimit = 5

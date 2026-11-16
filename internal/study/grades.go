@@ -4,8 +4,8 @@ import (
 	"context"
 	"strings"
 
-	"github.com/armenbarseghyan/moodle-mcp/internal/moodle"
-	"github.com/armenbarseghyan/moodle-mcp/internal/textfmt"
+	"github.com/armenbarseghyan/fhj-study-mcp/internal/moodle"
+	"github.com/armenbarseghyan/fhj-study-mcp/internal/textfmt"
 )
 
 // CourseGrades are the grades of one course.

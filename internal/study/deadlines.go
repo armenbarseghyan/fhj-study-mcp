@@ -9,8 +9,8 @@ import (
 
 	"golang.org/x/sync/errgroup"
 
-	"github.com/armenbarseghyan/moodle-mcp/internal/moodle"
-	"github.com/armenbarseghyan/moodle-mcp/internal/textfmt"
+	"github.com/armenbarseghyan/fhj-study-mcp/internal/moodle"
+	"github.com/armenbarseghyan/fhj-study-mcp/internal/textfmt"
 )
 
 // OverdueLookback is how far back unsubmitted assignments are reported.
@@ -19,7 +19,7 @@ const OverdueLookback = 7 * 24 * time.Hour
 // DeadlinesResult answers moodle_deadlines.
 type DeadlinesResult struct {
 	Days      int
-	Until     time.Time // exclusive: Vienna midnight after the last day
+	Until     time.Time // exclusive: midnight (display zone) after the last day
 	Upcoming  []Deadline
 	Overdue   []Deadline // unsubmitted assignments due in the last 7 days
 	Hidden    int        // assignments Moodle reported as not accessible
@@ -29,7 +29,7 @@ type DeadlinesResult struct {
 }
 
 // Deadlines merges calendar action events with assignment due dates for the
-// next `days` calendar days (until the end of the last day, Vienna time),
+// next `days` calendar days (until the end of the last day in the display zone),
 // adds the submission state of every assignment, and optionally reports
 // unsubmitted assignments that are overdue by up to 7 days.
 func (s *Service) Deadlines(ctx context.Context, days int, includeOverdue, refresh bool) (DeadlinesResult, error) {
@@ -104,7 +104,12 @@ func (s *Service) Deadlines(ctx context.Context, days int, includeOverdue, refre
 		return d.Due.Before(lookbackStart) || !d.Due.Before(res.Until)
 	})
 
-	// Submission state for every assignment and quiz candidate.
+	if err := s.resolveInstances(ctx, candidates, refresh, &stamp); err != nil {
+		return res, err
+	}
+
+	// Submission state for every assignment and quiz candidate whose activity
+	// id is known; the others keep SubmissionUnknown.
 	type state struct {
 		status Submission
 		ext    time.Time
@@ -112,17 +117,17 @@ func (s *Service) Deadlines(ctx context.Context, days int, includeOverdue, refre
 	}
 	var idx []int
 	for i, d := range candidates {
-		if d.Key.Module == "assign" || d.Key.Module == "quiz" {
+		if hasStatus(d.Key.Module) && d.Instance != 0 {
 			idx = append(idx, i)
 		}
 	}
 	states, errs, err := fanOut(ctx, idx, func(ctx context.Context, i int) (state, error) {
 		d := candidates[i]
 		if d.Key.Module == "quiz" {
-			f, err := s.src.QuizAttempts(ctx, d.Key.Instance, refresh)
+			f, err := s.src.QuizAttempts(ctx, d.Instance, refresh)
 			return state{status: QuizState(f.Value), at: f.At}, err
 		}
-		f, err := s.src.SubmissionStatus(ctx, d.Key.Instance, refresh)
+		f, err := s.src.SubmissionStatus(ctx, d.Instance, refresh)
 		if err != nil {
 			return state{}, err
 		}
@@ -135,7 +140,7 @@ func (s *Service) Deadlines(ctx context.Context, days int, includeOverdue, refre
 	for j, i := range idx {
 		if errs[j] != nil {
 			candidates[i].Status = SubmissionUnknown
-			s.log.Warn("submission status", "module", candidates[i].Key.Module, "instance", candidates[i].Key.Instance, "err", errs[j])
+			s.log.Warn("submission status", "module", candidates[i].Key.Module, "instance", candidates[i].Instance, "err", errs[j])
 			continue
 		}
 		stamp.add(states[j].at)
@@ -160,8 +165,52 @@ func (s *Service) Deadlines(ctx context.Context, days int, includeOverdue, refre
 	return res, nil
 }
 
+func hasStatus(module string) bool { return module == "assign" || module == "quiz" }
+
+// resolveInstances fills in the activity id of assignment and quiz deadlines
+// that came from the calendar alone (an event carries only the cmid), using
+// the course contents, which map cmid to instance. A course whose contents
+// cannot be read leaves its deadlines with Instance 0: their status is then
+// unknown, never looked up under a wrong id.
+func (s *Service) resolveInstances(ctx context.Context, ds []Deadline, refresh bool, stamp *oldest) error {
+	var courseIDs []int
+	for _, d := range ds {
+		if hasStatus(d.Key.Module) && d.Instance == 0 && d.Course.ID != 0 && !slices.Contains(courseIDs, d.Course.ID) {
+			courseIDs = append(courseIDs, d.Course.ID)
+		}
+	}
+	if len(courseIDs) == 0 {
+		return nil
+	}
+	contents, errs, err := fanOut(ctx, courseIDs, func(ctx context.Context, id int) (Fetched[[]moodle.Section], error) {
+		return s.src.Contents(ctx, id, refresh)
+	})
+	if err != nil {
+		return err
+	}
+	instance := map[DeadlineKey]int{}
+	for i, f := range contents {
+		if errs[i] != nil {
+			s.log.Warn("course contents", "course", courseIDs[i], "err", errs[i])
+			continue
+		}
+		stamp.add(f.At)
+		for _, sec := range f.Value {
+			for _, m := range sec.Modules {
+				instance[DeadlineKey{Module: m.ModName, CMID: m.ID}] = m.Instance
+			}
+		}
+	}
+	for i := range ds {
+		if ds[i].Instance == 0 {
+			ds[i].Instance = instance[ds[i].Key]
+		}
+	}
+	return nil
+}
+
 // MergeDeadlines combines calendar action events and assignment due dates,
-// deduplicating by (module, instance).
+// deduplicating by (module, cmid).
 //
 // Rules: the calendar's time wins over the assignment's duedate (it includes
 // user and group overrides); the assignment's name is preferred over the
@@ -170,6 +219,7 @@ func (s *Service) Deadlines(ctx context.Context, days int, includeOverdue, refre
 // are dropped; grading deadlines (teacher events) are ignored.
 func MergeDeadlines(events []moodle.Event, courses []moodle.CourseAssignments, refs map[int]CourseRef, base string) []Deadline {
 	byKey := map[DeadlineKey]*Deadline{}
+	rank := map[DeadlineKey]int{} // dueRank of the date an entry carries
 	var order []DeadlineKey
 	add := func(d *Deadline) {
 		byKey[d.Key] = d
@@ -195,14 +245,16 @@ func MergeDeadlines(events []moodle.Event, courses []moodle.CourseAssignments, r
 			if courseID == 0 {
 				courseID = c.ID
 			}
+			rank[DeadlineKey{Module: "assign", CMID: a.CMID}] = rankAssignment
 			add(&Deadline{
-				Key:     DeadlineKey{Module: "assign", Instance: a.ID},
-				Course:  ref(courseID, c.FullName),
-				Title:   strings.TrimSpace(a.Name),
-				URL:     moduleURL(base, "assign", a.CMID),
-				Due:     due,
-				Status:  SubmissionUnknown,
-				Sources: FromAssignments,
+				Key:      DeadlineKey{Module: "assign", CMID: a.CMID},
+				Instance: a.ID,
+				Course:   ref(courseID, c.FullName),
+				Title:    strings.TrimSpace(a.Name),
+				URL:      moduleURL(base, "assign", a.CMID),
+				Due:      due,
+				Status:   SubmissionUnknown,
+				Sources:  FromAssignments,
 			})
 		}
 	}
@@ -211,12 +263,18 @@ func MergeDeadlines(events []moodle.Event, courses []moodle.CourseAssignments, r
 		if e.ModuleName == "" || e.Instance == 0 || e.EventType == "gradingdue" {
 			continue
 		}
-		key := DeadlineKey{Module: e.ModuleName, Instance: e.Instance}
+		// An event's "instance" is the course-module id, not the activity id
+		// (Moodle's event exporter sets it from the cm).
+		key := DeadlineKey{Module: e.ModuleName, CMID: e.Instance}
+		r := dueRank(e.EventType)
+		if r < 0 {
+			continue // an opening date is not a deadline
+		}
 		due := e.TimeSort.Time()
 		if d, ok := byKey[key]; ok {
 			d.Sources |= FromCalendar
-			if !due.IsZero() {
-				d.Due = due
+			if !due.IsZero() && r > rank[key] {
+				d.Due, rank[key] = due, r
 			}
 			if d.URL == "" {
 				d.URL = e.URL
@@ -236,6 +294,7 @@ func MergeDeadlines(events []moodle.Event, courses []moodle.CourseAssignments, r
 		if e.ModuleName == "assign" || e.ModuleName == "quiz" {
 			status = SubmissionUnknown
 		}
+		rank[key] = r
 		add(&Deadline{
 			Key:     key,
 			Course:  ref(courseID, courseName),
@@ -253,6 +312,22 @@ func MergeDeadlines(events []moodle.Event, courses []moodle.CourseAssignments, r
 	}
 	sortDeadlines(out)
 	return out
+}
+
+// The calendar has several events per activity (a quiz opens and closes; a
+// completion date may be expected). dueRank orders them by how well they state
+// the deadline; an entry keeps the date of its highest-ranked source.
+const rankAssignment = 1 // mod_assign duedate, without user/group overrides
+
+func dueRank(eventType string) int {
+	switch eventType {
+	case "due", "close":
+		return 2 // includes overrides
+	case "open":
+		return -1
+	default: // "expectcompletionon" and other dates
+		return 1
+	}
 }
 
 func sortDeadlines(ds []Deadline) {

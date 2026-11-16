@@ -1,7 +1,7 @@
 ---
 name: moodle-briefing
 description: Study briefing from Moodle (FH JOANNEUM) — what is urgent, what teachers announced, what is due and whether it is submitted. Use this skill whenever the user asks about their studies in general or about the near future, in any language — "what's due this week", "anything urgent on moodle?", "did I miss anything?", "what's new?", "did they upload anything?", "good morning, what's up at uni", "was steht diese Woche an", "habe ich etwas verpasst" — even if Moodle is not named, and for daily or weekly check-ins. Do not use it to find a specific material (moodle-materials) or to work through one assignment (moodle-assignment).
-allowed-tools: mcp__moodle__moodle_announcements, mcp__moodle__moodle_deadlines, mcp__moodle__moodle_whats_new, mcp__moodle__moodle_grades, mcp__moodle__moodle_courses, Read, Glob
+allowed-tools: mcp__fhj__moodle_announcements, mcp__fhj__moodle_deadlines, mcp__fhj__moodle_whats_new, mcp__fhj__moodle_grades, mcp__fhj__moodle_courses, mcp__fhj__fhj_timetable, Read, Glob
 ---
 
 # Study briefing
@@ -19,6 +19,9 @@ Call both in parallel (they are independent):
 - `moodle_announcements` — posts by teachers. Most important: room changes, cancellations and
   assignment changes show up here at the last minute.
 - `moodle_deadlines` — deadlines with submission status and an overdue block.
+- `fhj_timetable` — the classes in the same window (`days` as for deadlines, at most 7). Classes
+  are not in Moodle; this is the FH timetable. If it says no search is set, add one line: "run the
+  setup again and enter your programme (e.g. dat26) to see classes here" — and carry on without it.
 
 Pick the window from the question:
 
@@ -57,7 +60,9 @@ Sort everything into three levels, top to bottom:
    teacher does not see it until it is submitted); an announcement moving or cancelling the
    next class.
 2. **📣 Announcements** — the other recent posts, 1–2 sentences of substance each.
-3. **📅 Coming up** — the remaining deadlines by date; already submitted ones in one line at
+3. **🗓 Classes** — today's and tomorrow's classes (time, course, room or MS-Teams); for a week,
+   one line per day. If an announcement moves or cancels one, say so next to it.
+4. **📅 Coming up** — the remaining deadlines by date; already submitted ones in one line at
    the end.
 
 If course profiles exist (skill moodle-course-profile; files in
@@ -79,6 +84,10 @@ Template (shown in English; write the headings and text in the user's language):
 
 ### 📣 Announcements
 - **<course>**: <one-sentence gist>. "<key quote in the original language>" · [open](<link>)
+
+### 🗓 Classes
+- **Today** 13:15–15:45 CET Programming and Data Processing (UE) · ES30i.EG.002
+- **Tomorrow** 17:15–19:45 CET Databases and Query Languages (IL) · MS-Teams
 
 ### 📅 Coming up
 | When | Course | What | Status |

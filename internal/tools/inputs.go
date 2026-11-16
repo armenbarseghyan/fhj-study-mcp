@@ -9,7 +9,7 @@ type CoursesIn struct {
 }
 
 type DeadlinesIn struct {
-	Days           int   `json:"days,omitempty" jsonschema:"how many calendar days ahead, including today; the window ends at the end of the last day, Vienna time"`
+	Days           int   `json:"days,omitempty" jsonschema:"how many calendar days ahead, including today; the window ends at the end of the last day in the user's time zone"`
 	IncludeOverdue *bool `json:"include_overdue,omitempty" jsonschema:"also list unsubmitted assignments overdue by up to 7 days"`
 	Refresh        bool  `json:"refresh,omitempty" jsonschema:"bypass the cache and ask Moodle again"`
 }
@@ -42,7 +42,14 @@ type WhatsNewIn struct {
 
 type DownloadIn struct {
 	FileURL string `json:"fileurl" jsonschema:"link to a file of this Moodle (…/pluginfile.php/… or …/webservice/pluginfile.php/…)"`
-	Dest    string `json:"dest,omitempty" jsonschema:"folder or full file path; empty means MOODLE_DOWNLOAD_DIR or ~/Downloads/moodle"`
+	Dest    string `json:"dest,omitempty" jsonschema:"folder or full file path inside the download folder or ~/Desktop, ~/Documents, ~/Downloads (no hidden or PowerShell folders); empty means MOODLE_DOWNLOAD_DIR or ~/Downloads/moodle"`
 }
 
 type WhoAmIIn struct{}
+
+type TimetableIn struct {
+	Days    int      `json:"days,omitempty" jsonschema:"how many calendar days, starting today"`
+	Query   string   `json:"query,omitempty" jsonschema:"timetable search: programme code and year, e.g. dat26 (also a course, room or lecturer); empty means FHJ_TIMETABLE"`
+	Groups  []string `json:"groups,omitempty" jsonschema:"show only these groups besides classes for everyone, e.g. [\"Gruppe 2\"]; empty means FHJ_TIMETABLE_GROUPS, or all groups"`
+	Refresh bool     `json:"refresh,omitempty" jsonschema:"bypass the cache (1 h) and ask the timetable again"`
+}

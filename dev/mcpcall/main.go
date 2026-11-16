@@ -1,10 +1,10 @@
-// Command mcpcall calls one moodle-mcp tool from the shell, through the real
+// Command mcpcall calls one fhj-study-mcp tool from the shell, through the real
 // server binary over stdio. Development only (skill evals, manual checks).
 //
 //	mcpcall -list
 //	mcpcall moodle_deadlines '{"days": 7}'
 //
-// The server binary is $MOODLE_MCP_BIN (default bin/moodle-mcp) and gets the
+// The server binary is $FHJ_MCP_BIN (default bin/fhj-study-mcp) and gets the
 // current environment (MOODLE_URL, MOODLE_TOKEN, ...).
 package main
 
@@ -31,9 +31,9 @@ func main() {
 }
 
 func run(list bool, args []string) error {
-	bin := os.Getenv("MOODLE_MCP_BIN")
+	bin := os.Getenv("FHJ_MCP_BIN")
 	if bin == "" {
-		bin = "bin/moodle-mcp"
+		bin = "bin/fhj-study-mcp"
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
 	defer cancel()

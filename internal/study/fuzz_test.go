@@ -3,8 +3,8 @@ package study_test
 import (
 	"testing"
 
-	"github.com/armenbarseghyan/moodle-mcp/internal/extract"
-	"github.com/armenbarseghyan/moodle-mcp/internal/study"
+	"github.com/armenbarseghyan/fhj-study-mcp/internal/extract"
+	"github.com/armenbarseghyan/fhj-study-mcp/internal/study"
 )
 
 // FuzzSearchInput: user queries and extracted text are arbitrary; matching,

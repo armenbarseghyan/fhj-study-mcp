@@ -16,7 +16,7 @@ import (
 	"github.com/modelcontextprotocol/go-sdk/auth"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 
-	"github.com/armenbarseghyan/moodle-mcp/internal/tools"
+	"github.com/armenbarseghyan/fhj-study-mcp/internal/tools"
 )
 
 // MCPPath is where the streamable HTTP endpoint is mounted.
@@ -25,7 +25,7 @@ const MCPPath = "/mcp"
 // New returns an MCP server with all tools registered.
 func New(deps tools.Deps) *mcp.Server {
 	s := mcp.NewServer(
-		&mcp.Implementation{Name: "moodle-mcp", Title: "Moodle (read-only)", Version: deps.Version},
+		&mcp.Implementation{Name: "fhj-study-mcp", Title: "FH JOANNEUM study (read-only)", Version: deps.Version},
 		&mcp.ServerOptions{Instructions: tools.Instructions},
 	)
 	tools.Register(s, deps)

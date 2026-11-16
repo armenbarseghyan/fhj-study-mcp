@@ -9,10 +9,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/armenbarseghyan/moodle-mcp/internal/moodle"
-	"github.com/armenbarseghyan/moodle-mcp/internal/render"
-	"github.com/armenbarseghyan/moodle-mcp/internal/study"
-	"github.com/armenbarseghyan/moodle-mcp/internal/textfmt"
+	"github.com/armenbarseghyan/fhj-study-mcp/internal/moodle"
+	"github.com/armenbarseghyan/fhj-study-mcp/internal/render"
+	"github.com/armenbarseghyan/fhj-study-mcp/internal/study"
+	"github.com/armenbarseghyan/fhj-study-mcp/internal/textfmt"
 )
 
 type timeoutErr struct{}

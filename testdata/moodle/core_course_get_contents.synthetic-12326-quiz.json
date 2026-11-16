@@ -1,0 +1,33 @@
+[
+  {
+    "id": 99001,
+    "name": "Quizzes",
+    "visible": 1,
+    "summary": "",
+    "summaryformat": 1,
+    "section": 20,
+    "hiddenbynumsections": 0,
+    "uservisible": true,
+    "modules": [
+      {
+        "id": 190077,
+        "url": "https://moodle.fh-joanneum.at/mod/quiz/view.php?id=190077",
+        "name": "Quiz LaTeX Basics",
+        "instance": 77,
+        "contextid": 990077,
+        "visible": 1,
+        "uservisible": true,
+        "visibleoncoursepage": 1,
+        "modicon": "https://moodle.fh-joanneum.at/theme/image.php/boost/quiz/1/monologo",
+        "modname": "quiz",
+        "modplural": "Tests",
+        "indent": 0,
+        "onclick": "",
+        "afterlink": null,
+        "customdata": "\"\"",
+        "noviewlink": false,
+        "completion": 0
+      }
+    ]
+  }
+]

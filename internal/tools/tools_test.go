@@ -6,21 +6,24 @@ import (
 	"errors"
 	"flag"
 	"net/http"
+	"net/http/httptest"
 	"net/url"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 	"time"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 
-	"github.com/armenbarseghyan/moodle-mcp/internal/cache"
-	"github.com/armenbarseghyan/moodle-mcp/internal/moodle"
-	"github.com/armenbarseghyan/moodle-mcp/internal/moodletest"
-	"github.com/armenbarseghyan/moodle-mcp/internal/study"
-	"github.com/armenbarseghyan/moodle-mcp/internal/textfmt"
-	"github.com/armenbarseghyan/moodle-mcp/internal/tools"
+	"github.com/armenbarseghyan/fhj-study-mcp/internal/cache"
+	"github.com/armenbarseghyan/fhj-study-mcp/internal/moodle"
+	"github.com/armenbarseghyan/fhj-study-mcp/internal/moodletest"
+	"github.com/armenbarseghyan/fhj-study-mcp/internal/study"
+	"github.com/armenbarseghyan/fhj-study-mcp/internal/textfmt"
+	"github.com/armenbarseghyan/fhj-study-mcp/internal/timetable"
+	"github.com/armenbarseghyan/fhj-study-mcp/internal/tools"
 )
 
 var update = flag.Bool("update", false, "rewrite golden files")
@@ -50,12 +53,34 @@ func setup(t *testing.T, token string, extra ...moodletest.Option) *env {
 	dl := t.TempDir()
 	clock := func() time.Time { return now }
 	svc := study.New(cache.NewSource(client, clock), study.Options{Now: clock, DownloadDir: dl})
-	return connect(t, tools.Deps{Service: svc, Now: clock, Version: "test"}, srv, dl)
+	tt := timetable.New(timetable.Options{URL: fakeTimetable(t).URL, Now: clock})
+	return connect(t, tools.Deps{Service: svc, Now: clock, Version: "test", Timetable: tt, TimetableQuery: "dat26"}, srv, dl)
+}
+
+// fakeTimetable serves the synthetic DAT26 week for q=dat26 and the
+// timetable's answer to a search without results (HTTP 500, empty JSON body)
+// for anything else.
+func fakeTimetable(t *testing.T) *httptest.Server {
+	t.Helper()
+	body, err := os.ReadFile(filepath.Join(moodletest.TestdataDir(), "timetable", "dat26.synthetic.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		if !strings.HasPrefix(r.URL.Query().Get("q"), "dat26") {
+			w.WriteHeader(http.StatusInternalServerError)
+			return
+		}
+		_, _ = w.Write(body)
+	}))
+	t.Cleanup(ts.Close)
+	return ts
 }
 
 func connect(t *testing.T, deps tools.Deps, srv *moodletest.Server, dl string) *env {
 	t.Helper()
-	server := mcp.NewServer(&mcp.Implementation{Name: "moodle-mcp", Version: "test"}, nil)
+	server := mcp.NewServer(&mcp.Implementation{Name: "fhj-study-mcp", Version: "test"}, nil)
 	tools.Register(server, deps)
 	st, ct := mcp.NewInMemoryTransports()
 	ctx := context.Background()
@@ -144,6 +169,9 @@ func TestToolsGolden(t *testing.T) {
 		{"whats_new.5d", "moodle_whats_new", map[string]any{"days": 5}},
 		{"whats_new.1d", "moodle_whats_new", map[string]any{"days": 1}},
 		{"whoami", "moodle_whoami", nil},
+		{"timetable", "fhj_timetable", nil},
+		{"timetable.groups", "fhj_timetable", map[string]any{"groups": []string{"Gruppe 1"}, "days": 14}},
+		{"timetable.empty", "fhj_timetable", map[string]any{"query": "chemistry"}},
 	}
 	e := setup(t, moodletest.Token)
 	currentHost = e.srv.URL
@@ -167,7 +195,7 @@ func TestDeadlines_Semantics(t *testing.T) {
 		"Quiz LaTeX Basics",          // calendar only
 		"Homework R1", "✅ submitted", // merged from both sources
 		"Homework R2", // assignment only
-		"2026-10-07 17:15 (Wednesday) — in 5 days",
+		"2026-10-07 17:15 CEST (Wednesday) — in 5 days",
 		"Hidden or not yet available: 1 assignment",
 	}
 	for _, s := range mustContain {
@@ -182,6 +210,26 @@ func TestDeadlines_Semantics(t *testing.T) {
 	}
 	if n := strings.Count(out, "Homework R1"); n != 1 {
 		t.Errorf("Homework R1 appears %d times, want 1 (dedup)", n)
+	}
+
+	// The calendar's "instance" is a cmid (190501); status calls must use the
+	// activity id (501), and the calendar-only quiz must be resolved to 77.
+	var assignIDs, quizIDs []string
+	for _, r := range e.srv.Requests() {
+		switch r.Form.Get("wsfunction") {
+		case "mod_assign_get_submission_status":
+			assignIDs = append(assignIDs, r.Form.Get("assignid"))
+		case "mod_quiz_get_user_attempts":
+			quizIDs = append(quizIDs, r.Form.Get("quizid"))
+		}
+	}
+	for _, id := range assignIDs {
+		if strings.HasPrefix(id, "190") {
+			t.Errorf("submission status asked with cmid %s as assignid (all: %v)", id, assignIDs)
+		}
+	}
+	if !slices.Equal(quizIDs, []string{"77"}) {
+		t.Errorf("quiz attempts asked for %v, want [77]", quizIDs)
 	}
 }
 
@@ -273,6 +321,13 @@ func TestDownload(t *testing.T) {
 		t.Fatalf("file: %q %v", b, err)
 	}
 
+	// A hidden folder in the home directory is refused before anything is fetched.
+	before := e.srv.Calls("pluginfile")
+	out, isErr = e.call(t, "moodle_download", map[string]any{"fileurl": browserURL, "dest": "~/.ssh/"})
+	if !isErr || !strings.Contains(out, "saved only into the download folder") || e.srv.Calls("pluginfile") != before {
+		t.Fatalf("hidden dest: isErr=%v %s", isErr, out)
+	}
+
 	out, isErr = e.call(t, "moodle_download", map[string]any{"fileurl": "https://evil.example/pluginfile.php/1/a.pdf"})
 	if !isErr || !strings.Contains(out, "does not point to a file of this Moodle") {
 		t.Fatalf("foreign URL: isErr=%v %s", isErr, out)
@@ -317,7 +372,7 @@ func TestListTools(t *testing.T) {
 		byName[tl.Name] = tl
 	}
 	want := []string{"moodle_courses", "moodle_deadlines", "moodle_course_contents", "moodle_search",
-		"moodle_grades", "moodle_announcements", "moodle_whats_new", "moodle_download", "moodle_whoami"}
+		"moodle_grades", "moodle_announcements", "moodle_whats_new", "moodle_download", "moodle_whoami", "fhj_timetable"}
 	if len(byName) != len(want) {
 		t.Errorf("tools = %d, want %d", len(byName), len(want))
 	}
@@ -380,5 +435,66 @@ func TestSearchInFiles_TextIsCached(t *testing.T) {
 	e.call(t, "moodle_search", map[string]any{"query": "vpn", "in_files": true, "course": "12308"})
 	if n := e.srv.Calls("pluginfile"); n != first {
 		t.Errorf("unchanged files fetched again: %d → %d", first, n)
+	}
+}
+
+// The timetable needs no Moodle: it works without a token, and it explains
+// what to set when no search is configured.
+func TestTimetable_WithoutMoodle(t *testing.T) {
+	clock := func() time.Time { return now }
+	tt := timetable.New(timetable.Options{URL: fakeTimetable(t).URL, Now: clock})
+	e := connect(t, tools.Deps{InitErr: errors.New("MOODLE_TOKEN is not set"), Now: clock, Timetable: tt}, nil, "")
+	out, isErr := e.call(t, "fhj_timetable", map[string]any{"query": "dat26"})
+	if isErr || !strings.Contains(out, "Programming and Data Processing (UE)") {
+		t.Fatalf("isErr=%v\n%s", isErr, out)
+	}
+	// Groups are matched as typed in the setup, case-insensitively.
+	out, isErr = e.call(t, "fhj_timetable", map[string]any{"query": "dat26", "groups": []string{" gruppe 1"}})
+	if isErr || !strings.Contains(out, "· Gruppe 1 ·") || strings.Contains(out, "· Gruppe 2 ·") {
+		t.Fatalf("lower-case group: isErr=%v\n%s", isErr, out)
+	}
+	out, isErr = e.call(t, "fhj_timetable", nil)
+	if !isErr || !strings.Contains(out, "FHJ_TIMETABLE") {
+		t.Fatalf("no query: isErr=%v %s", isErr, out)
+	}
+	if out, _ := e.call(t, "moodle_deadlines", nil); !strings.Contains(out, "MOODLE_TOKEN") {
+		t.Fatalf("Moodle tools still report the init error: %s", out)
+	}
+}
+
+// When the course contents cannot be read, a calendar-only quiz has no known
+// activity id: its status stays unknown and its cmid is never sent as quizid.
+func TestDeadlines_QuizWithoutContents(t *testing.T) {
+	e := setup(t, moodletest.Token, moodletest.Route("core_course_get_contents", func(url.Values) moodletest.Resp {
+		return moodletest.ErrorFile(t, "requireloginerror")
+	}))
+	out, isErr := e.call(t, "moodle_deadlines", nil)
+	if isErr || !strings.Contains(out, "Quiz LaTeX Basics") || strings.Contains(out, "not attempted yet") {
+		t.Fatalf("isErr=%v\n%s", isErr, out)
+	}
+	if n := e.srv.Calls("mod_quiz_get_user_attempts"); n != 0 {
+		t.Errorf("quiz attempts asked %d times without a known quiz id", n)
+	}
+}
+
+// Configured groups apply to the configured search only; after the last class
+// of the period the answer says so instead of hinting at a failure.
+func TestTimetable_GroupsAndLateEvening(t *testing.T) {
+	late := time.Date(2026, 10, 2, 21, 0, 0, 0, textfmt.Vienna)
+	clock := func() time.Time { return late }
+	tt := timetable.New(timetable.Options{URL: fakeTimetable(t).URL, Now: clock})
+	e := connect(t, tools.Deps{Now: clock, Timetable: tt, TimetableQuery: "dat26", TimetableGroups: []string{"Gruppe 2"}}, nil, "")
+
+	out, _ := e.call(t, "fhj_timetable", map[string]any{"days": 7})
+	if strings.Contains(out, "Gruppe 3") || !strings.Contains(out, "Only Gruppe 2") {
+		t.Errorf("configured search must use the configured groups:\n%s", out)
+	}
+	out, _ = e.call(t, "fhj_timetable", map[string]any{"days": 7, "query": "dat26 speaker:Erika"})
+	if !strings.Contains(out, "Gruppe 3") || strings.Contains(out, "Only Gruppe 2") {
+		t.Errorf("another search must not inherit the configured groups:\n%s", out)
+	}
+	out, _ = e.call(t, "fhj_timetable", map[string]any{"days": 1})
+	if !strings.Contains(out, "No more classes") || strings.Contains(out, "failures") {
+		t.Errorf("after today's last class:\n%s", out)
 	}
 }

@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/armenbarseghyan/moodle-mcp/internal/textfmt"
+	"github.com/armenbarseghyan/fhj-study-mcp/internal/textfmt"
 )
 
 func vie(s string) time.Time {
@@ -16,18 +16,36 @@ func vie(s string) time.Time {
 	return t
 }
 
+// Not parallel: it changes the package-wide display zone, and parallel tests
+// only start after the sequential ones have finished.
+func TestDate_UserZone(t *testing.T) {
+	almaty, err := time.LoadLocation("Asia/Almaty")
+	if err != nil {
+		t.Fatal(err)
+	}
+	textfmt.SetZone(almaty)
+	defer textfmt.SetZone(textfmt.Vienna)
+	due := vie("2026-11-17 23:59") // a Vienna deadline
+	if got, want := textfmt.Date(due), "2026-11-18 03:59 +05 (Wednesday)"; got != want {
+		t.Errorf("Date = %q, want %q", got, want)
+	}
+	if got := textfmt.Relative(due, vie("2026-11-17 12:00")); got != "tomorrow" {
+		t.Errorf("Relative = %q, want tomorrow (calendar day in Almaty)", got)
+	}
+}
+
 func TestDate(t *testing.T) {
 	t.Parallel()
 	tests := []struct {
 		in   time.Time
 		want string
 	}{
-		{vie("2026-10-07 17:15"), "2026-10-07 17:15 (Wednesday)"},
-		{vie("2026-10-04 00:00"), "2026-10-04 00:00 (Sunday)"},
+		{vie("2026-10-07 17:15"), "2026-10-07 17:15 CEST (Wednesday)"},
+		{vie("2026-10-04 00:00"), "2026-10-04 00:00 CEST (Sunday)"},
 		// Moodle timestamps are UTC instants; output must be Vienna wall time.
-		{time.Unix(1791386100, 0).UTC(), "2026-10-07 17:15 (Wednesday)"},
+		{time.Unix(1791386100, 0).UTC(), "2026-10-07 17:15 CEST (Wednesday)"},
 		// Winter time: 23:59 UTC on 31.12 is already 1 January in Vienna.
-		{time.Date(2026, 12, 31, 23, 59, 0, 0, time.UTC), "2027-01-01 00:59 (Friday)"},
+		{time.Date(2026, 12, 31, 23, 59, 0, 0, time.UTC), "2027-01-01 00:59 CET (Friday)"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.want, func(t *testing.T) {

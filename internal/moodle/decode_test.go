@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/armenbarseghyan/moodle-mcp/internal/moodle"
+	"github.com/armenbarseghyan/fhj-study-mcp/internal/moodle"
 )
 
 func TestBool(t *testing.T) {

@@ -1,6 +1,6 @@
-# Skills for moodle-mcp
+# Skills for fhj-study-mcp
 
-Skills for Claude Code and Codex that turn the moodle-mcp tools into good study workflows. Written and
+Skills for Claude Code and Codex that turn the fhj-study-mcp tools into good study workflows. Written and
 tested in English.
 
 | Skill | Use it for | Example prompts |
@@ -30,6 +30,11 @@ installing.
   or `token=`.
 - **Invent nothing**: empty data is said plainly; general knowledge is labelled as such.
 - **Read-only**: the skills point to where to click; the server cannot submit or post.
+- **Classes come from the FH timetable**, not Moodle: `fhj_timetable` (the briefing shows today's
+  and tomorrow's). The setup asks for the programme (e.g. `dat26`) and, optionally, your groups.
+- **Ask before touching the disk**: `allowed-tools` pre-approves only reading tools. Downloads,
+  writing files and running the dashboard/profile scripts still ask the user, because Moodle
+  content (pages, posts, files) is untrusted text that reaches the assistant.
 - **Actions over facts**: "submit the draft" rather than "status: draft".
 
 ## Course profiles

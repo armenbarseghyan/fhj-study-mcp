@@ -9,8 +9,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/armenbarseghyan/moodle-mcp/internal/moodle"
-	"github.com/armenbarseghyan/moodle-mcp/internal/moodletest"
+	"github.com/armenbarseghyan/fhj-study-mcp/internal/moodle"
+	"github.com/armenbarseghyan/fhj-study-mcp/internal/moodletest"
 )
 
 // Every fixture must decode into its wire type. This catches drift between
@@ -175,7 +175,7 @@ func TestActionEvents(t *testing.T) {
 		t.Fatalf("events = %d", len(evs))
 	}
 	e := evs[1]
-	if e.ModuleName != "assign" || e.Instance != 501 || e.Course == nil || e.Course.ID != 12308 ||
+	if e.ModuleName != "assign" || e.Instance != 190501 || e.Course == nil || e.Course.ID != 12308 ||
 		e.URL == "" || e.Action == nil || !bool(e.Action.Actionable) || e.TimeSort.Time().IsZero() {
 		t.Errorf("event = %+v", e)
 	}

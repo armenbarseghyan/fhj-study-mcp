@@ -12,8 +12,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/armenbarseghyan/moodle-mcp/internal/moodle"
-	"github.com/armenbarseghyan/moodle-mcp/internal/moodletest"
+	"github.com/armenbarseghyan/fhj-study-mcp/internal/moodle"
+	"github.com/armenbarseghyan/fhj-study-mcp/internal/moodletest"
 )
 
 func TestToWebserviceURL(t *testing.T) {
@@ -145,6 +145,12 @@ func TestDownload(t *testing.T) {
 			urlPath:  "/pluginfile.php/1/x.pdf",
 			dest:     func(d string) string { return filepath.Join(d, "sub", "renamed.pdf") },
 			wantName: filepath.Join("sub", "renamed.pdf"),
+		},
+		{
+			name:     "new path without extension is a folder, not a file",
+			urlPath:  "/pluginfile.php/1/x.pdf",
+			dest:     func(d string) string { return filepath.Join(d, "pdp") },
+			wantName: filepath.Join("pdp", "x.pdf"),
 		},
 		{
 			name:     "dir with trailing slash is created",

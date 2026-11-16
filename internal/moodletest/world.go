@@ -1,6 +1,7 @@
 package moodletest
 
 import (
+	"encoding/json"
 	"net/http"
 	"net/url"
 	"os"
@@ -35,7 +36,10 @@ func World(r Reporter, extra ...Option) []Option {
 			case "12308":
 				return File(r, "core_course_get_contents", "real-12308")
 			case "12326":
-				return File(r, "core_course_get_contents", "real-12326-subsections")
+				// The recording has no quiz; the synthetic section adds the
+				// calendar's quiz (cmid 190077, instance 77).
+				return concatArrays(r, File(r, "core_course_get_contents", "real-12326-subsections"),
+					File(r, "core_course_get_contents", "synthetic-12326-quiz"))
 			}
 			return Raw(200, "[]")
 		}),
@@ -99,4 +103,21 @@ func SampleFiles(r Reporter) http.Handler {
 			http.NotFound(w, req)
 		}
 	})
+}
+
+// concatArrays joins two JSON array responses into one.
+func concatArrays(r Reporter, a, b Resp) Resp {
+	r.Helper()
+	var x, y []json.RawMessage
+	if err := json.Unmarshal(a.Body, &x); err != nil {
+		r.Fatalf("moodletest: %v", err)
+	}
+	if err := json.Unmarshal(b.Body, &y); err != nil {
+		r.Fatalf("moodletest: %v", err)
+	}
+	body, err := json.Marshal(append(x, y...))
+	if err != nil {
+		r.Fatalf("moodletest: %v", err)
+	}
+	return Resp{Body: body}
 }

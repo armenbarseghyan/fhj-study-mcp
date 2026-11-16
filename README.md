@@ -1,7 +1,7 @@
-# moodle-mcp
+# fhj-study-mcp
 
-[![CI](https://github.com/armenbarseghyan/moodle-mcp/actions/workflows/ci.yml/badge.svg)](https://github.com/armenbarseghyan/moodle-mcp/actions/workflows/ci.yml)
-[![Release](https://img.shields.io/github/v/release/armenbarseghyan/moodle-mcp)](https://github.com/armenbarseghyan/moodle-mcp/releases/latest)
+[![CI](https://github.com/armenbarseghyan/fhj-study-mcp/actions/workflows/ci.yml/badge.svg)](https://github.com/armenbarseghyan/fhj-study-mcp/actions/workflows/ci.yml)
+[![Release](https://img.shields.io/github/v/release/armenbarseghyan/fhj-study-mcp)](https://github.com/armenbarseghyan/fhj-study-mcp/releases/latest)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
 **Your FH JOANNEUM Moodle inside Claude Code or Codex.** Ask about deadlines, materials,
@@ -34,11 +34,11 @@ checksum-verified program.
 Open a terminal and run:
 
 ```bash
-git clone https://github.com/armenbarseghyan/moodle-mcp.git
+git clone https://github.com/armenbarseghyan/fhj-study-mcp.git
 ```
 
 ```bash
-cd moodle-mcp && ./setup.sh
+cd fhj-study-mcp && ./setup.sh
 ```
 
 ### Windows
@@ -46,8 +46,8 @@ cd moodle-mcp && ./setup.sh
 Open **PowerShell** and run:
 
 ```powershell
-git clone https://github.com/armenbarseghyan/moodle-mcp.git
-cd moodle-mcp
+git clone https://github.com/armenbarseghyan/fhj-study-mcp.git
+cd fhj-study-mcp
 powershell -ExecutionPolicy Bypass -File .\setup.ps1
 ```
 
@@ -55,7 +55,9 @@ powershell -ExecutionPolicy Bypass -File .\setup.ps1
 
 1. The script asks for your **FH username and password once**. They go only to
    `moodle.fh-joanneum.at` and are not saved anywhere.
-2. Answer **Y** when it offers to install the skills (recommended).
+2. It asks which assistant to set up (if you have both), your programme for the class
+   timetable (e.g. `dat26`, Enter to skip) and, optionally, your groups (`Gruppe 2`).
+   Answer **Y** when it offers to install the skills (recommended).
 3. When it prints `Done`, **restart Claude Code / Codex** and ask:
    *"check my moodle connection"*.
 
@@ -72,20 +74,25 @@ answers about grades and priorities follow the real rules.
 ## Update
 
 ```bash
-cd moodle-mcp && git pull && ./setup.sh
+cd fhj-study-mcp && git pull && ./setup.sh
 ```
 
 On Windows run `git pull`, then `setup.ps1` again as above. It asks for your login again and
 replaces the old registration.
 
+**Installed before the rename (as `moodle-mcp`)?** Your folder is still called `moodle-mcp`;
+`git pull` keeps working. The server is now registered as `fhj`, so remove the old entry once,
+or every tool shows up twice: `claude mcp remove moodle` (Codex: `codex mcp remove moodle`).
+The setup reminds you if it finds it.
+
 ## Uninstall
 
 ```bash
-claude mcp remove moodle -s user     # Claude Code
-codex mcp remove moodle              # Codex
+claude mcp remove fhj -s user     # Claude Code
+codex mcp remove fhj              # Codex
 ```
 
-Then delete the `moodle-mcp` folder and the `moodle-*` links in `~/.claude/skills` and
+Then delete the `fhj-study-mcp` folder and the `moodle-*` links in `~/.claude/skills` and
 `~/.agents/skills`.
 
 ## If something doesn't work
@@ -103,15 +110,17 @@ through the checks.
 
 ## What's inside
 
-- **9 tools:** deadlines (assignments and quizzes, with submission status), what's new (new
+- **10 tools:** deadlines (assignments and quizzes, with submission status), what's new (new
   or updated files, announcements and grades in one call), announcements, courses, course contents, search (also *inside* PDFs, Word, PowerPoint, notebooks, with
-  page numbers), grades with feedback, file download, and a self-check.
+  page numbers), grades with feedback, file download, a self-check, and the **class timetable** (when and
+  where your classes are, from the FH timetable).
 - **7 [skills](skills/README.md)** on top of them: briefing, finding and quoting material,
   working through an assignment, grades, a visual dashboard, course profiles from the
   syllabi, and setup diagnostics.
 
-**Privacy.** The server talks only to `moodle.fh-joanneum.at`, and your token stays in your
-client's config on your computer. It is masked in all logs and output. What you ask about is
+**Privacy.** The server talks only to `moodle.fh-joanneum.at` and, for the class timetable, to the
+public FH timetable at `almaty.fh-joanneum.at` (no login; it gets only your search, e.g. `dat26`).
+Your token stays in your client's config on your computer and goes only to Moodle. It is masked in all logs and output. What you ask about is
 sent to the assistant like anything else you type into a chat. See [SECURITY.md](SECURITY.md).
 
 ---
@@ -128,6 +137,9 @@ Architecture and design decisions: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
 | `MOODLE_TOKEN` | yes | — | personal token of the `moodle_mobile_app` service |
 | `MOODLE_DOWNLOAD_DIR` | no | `~/Downloads/moodle` | where `moodle_download` and dashboards put files |
 | `MOODLE_LOG_LEVEL` | no | `info` | `debug`, `info`, `warn`, `error` |
+| `FHJ_TIMETABLE` | no | — | timetable search for `fhj_timetable`, e.g. `dat26` (the setup asks) |
+| `FHJ_TIMETABLE_GROUPS` | no | all groups | your groups, comma-separated, e.g. `Gruppe 2` |
+| `FHJ_TZ` | no | this computer's zone | time zone for dates, e.g. `Europe/Vienna` |
 | `MCP_HTTP_ADDR` | no | — | same as `-http`: serve streamable HTTP instead of stdio |
 | `MCP_HTTP_TOKEN` | for non-loopback addresses | — | bearer token HTTP clients must send |
 
@@ -138,13 +150,13 @@ starts and every tool explains what is missing.
 ### Registering by hand
 
 `setup.sh` does this; by hand (the path must be absolute). Codex: the same with
-`codex mcp add moodle --env … --env … -- <path>`.
+`codex mcp add fhj --env … --env … -- <path>`.
 
 ```bash
-claude mcp add moodle --scope user \
+claude mcp add fhj --scope user \
   -e MOODLE_URL=https://moodle.fh-joanneum.at \
   -e MOODLE_TOKEN=<your token> \
-  -- /absolute/path/to/moodle-mcp/bin/moodle-mcp
+  -- /absolute/path/to/fhj-study-mcp/bin/fhj-study-mcp
 ```
 
 Check: `moodle_whoami` shows the user, the site version and any missing functions.
@@ -152,7 +164,7 @@ Check: `moodle_whoami` shows the user, the site version and any missing function
 ### HTTP instead of stdio
 
 ```bash
-MCP_HTTP_TOKEN=<secret> ./bin/moodle-mcp -http 127.0.0.1:8765
+MCP_HTTP_TOKEN=<secret> ./bin/fhj-study-mcp -http 127.0.0.1:8765
 ```
 
 The endpoint is `http://127.0.0.1:8765/mcp` (streamable HTTP); `GET /healthz` is a liveness
@@ -162,25 +174,26 @@ browser cross-origin requests are rejected, and with `MCP_HTTP_TOKEN` every requ
 LAN) without a token, because it holds your Moodle token.
 
 ```bash
-claude mcp add moodle-http --transport http http://127.0.0.1:8765/mcp --header "Authorization: Bearer <secret>"
+claude mcp add fhj-http --transport http http://127.0.0.1:8765/mcp --header "Authorization: Bearer <secret>"
 ```
 
 ### Tools
 
 | Tool | Parameters | What it does |
 |---|---|---|
-| `moodle_deadlines` | `days=14`, `include_overdue=true`, `refresh` | Deadlines until the end of day N (Vienna): calendar + assignment due dates, deduplicated, submission status for every assignment and attempt status for every quiz, unsubmitted assignments overdue by up to 7 days |
+| `moodle_deadlines` | `days=14`, `include_overdue=true`, `refresh` | Deadlines until the end of day N (your time zone): calendar + assignment due dates, deduplicated, submission status for every assignment and attempt status for every quiz, unsubmitted assignments overdue by up to 7 days |
 | `moodle_whats_new` | `days=7`, `refresh` | Everything that changed lately in one call: new or updated files in all active courses (by course, with section and links), announcements, new grades |
 | `moodle_announcements` | `days=7`, `refresh` | Recent posts in the announcement forums of all courses |
 | `moodle_courses` | `include_past`, `refresh` | Active courses: id, name, dates, progress |
 | `moodle_course_contents` | `course`, `refresh` | A course's material by section (incl. Moodle 4.5 subsections) with file links. `course` is an id or part of the name; ambiguous queries return candidates |
 | `moodle_search` | `query`, `course=""`, `in_files=false`, `refresh` | Search names, descriptions, sections and file names in all active courses (or one). With `in_files=true` also the text of PDF, docx, pptx, ipynb, zip and Moodle pages, with page numbers and a quote |
 | `moodle_grades` | `course=""` | Grades: score, maximum, percentage, feedback; one course or all |
-| `moodle_download` | `fileurl`, `dest=""` | Downloads a file of this Moodle and returns the local path |
+| `moodle_download` | `fileurl`, `dest=""` | Downloads a file of this Moodle and returns the local path. `dest` must be in the download folder or in Desktop, Documents or Downloads |
 | `moodle_whoami` | — | Diagnostics: user, site, version, available functions |
+| `fhj_timetable` | `days=7`, `query=""`, `groups=[]`, `refresh` | Classes of the next N days from the FH timetable (`almaty.fh-joanneum.at`, not Moodle): time, course, type, lecturer, group, room. `query` defaults to `FHJ_TIMETABLE` (e.g. `dat26`), `groups` to `FHJ_TIMETABLE_GROUPS`; classes for everyone are always shown. Cached 1 h |
 
-Output is compact markdown. Dates look like `2026-10-07 17:15 (Wednesday) — in 5 days`,
-Europe/Vienna. File links are browser links (`…/pluginfile.php/…`): they open where you are
+Output is compact markdown. Dates look like `2026-10-07 17:15 CEST (Wednesday) — in 5 days`, in
+your computer's time zone (or `FHJ_TZ`), always with the zone. File links are browser links (`…/pluginfile.php/…`): they open where you are
 signed in to Moodle and never contain the token. Output is English; all user-facing strings go
 through a `golang.org/x/text/message` catalog, so other languages can be added later.
 

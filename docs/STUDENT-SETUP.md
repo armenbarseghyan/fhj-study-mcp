@@ -1,4 +1,4 @@
-# moodle-mcp — setup guide for students
+# fhj-study-mcp — setup guide for students
 
 Connect your FH JOANNEUM Moodle to Claude Code or Codex in about five minutes. Afterwards you can ask,
 in any language, things like *"what's due this week?"*, *"where is the guide for the lab VM?"*
@@ -27,11 +27,11 @@ You need:
 ### macOS and Linux
 
 ```bash
-git clone https://github.com/armenbarseghyan/moodle-mcp.git
+git clone https://github.com/armenbarseghyan/fhj-study-mcp.git
 ```
 
 ```bash
-cd moodle-mcp && ./setup.sh
+cd fhj-study-mcp && ./setup.sh
 ```
 
 This works the same from zsh (the macOS default), bash, fish or any other shell: `setup.sh` runs
@@ -40,8 +40,8 @@ under bash itself, so nothing depends on the shell you type in.
 ### Windows (PowerShell)
 
 ```powershell
-git clone https://github.com/armenbarseghyan/moodle-mcp.git
-cd moodle-mcp
+git clone https://github.com/armenbarseghyan/fhj-study-mcp.git
+cd fhj-study-mcp
 powershell -ExecutionPolicy Bypass -File .\setup.ps1
 ```
 
@@ -69,7 +69,7 @@ After `git pull`, run it again to get the new version.
 ## What the setup does
 
 1. **Checks** which clients are installed (`claude`, `codex`) and, on macOS/Linux, `curl`.
-2. **Builds** `bin/moodle-mcp` with Go — or, without Go, downloads the release binary for
+2. **Builds** `bin/fhj-study-mcp` with Go — or, without Go, downloads the release binary for
    your system and verifies its SHA-256 checksum before using it.
 3. **Gets your token** from `https://moodle.fh-joanneum.at/login/token.php`, the endpoint the
    official Moodle app signs in with. The password is read hidden, sent only there (through
@@ -78,8 +78,8 @@ After `git pull`, run it again to get the new version.
 5. **Checks it against Moodle** (`core_webservice_get_site_info`) and prints
    `signed in as <your name>`. A bad token stops here, before anything is registered.
 6. **Registers** the server for your user:
-   Claude Code — `claude mcp add moodle --scope user -e MOODLE_URL=… -e MOODLE_TOKEN=… -- <absolute path>`,
-   then checks that it connects; Codex — `codex mcp add moodle --env MOODLE_URL=… --env MOODLE_TOKEN=… -- <absolute path>`
+   Claude Code — `claude mcp add fhj --scope user -e MOODLE_URL=… -e MOODLE_TOKEN=… -- <absolute path>`,
+   then checks that it connects; Codex — `codex mcp add fhj --env MOODLE_URL=… --env MOODLE_TOKEN=… -- <absolute path>`
    (written to `~/.codex/config.toml`).
 7. **Links the skills** (asks first) into `~/.claude/skills` for Claude Code and
    `~/.agents/skills` for Codex. Skills teach the assistant good
@@ -134,7 +134,7 @@ browser sessions). Copying both together gives 64 characters and Moodle answers
 ### Keep it secret
 
 - The token works like your password for Moodle — **don't share it**, don't post it in group
-  chats, don't paste it into a Claude chat, don't commit it to git. moodle-mcp only reads, but
+  chats, don't paste it into a Claude chat, don't commit it to git. fhj-study-mcp only reads, but
   the token itself is not limited to reading.
 - Running the setup again gives you a working token again; Moodle usually hands out the same
   one while it is valid.
@@ -179,11 +179,11 @@ Take the value of **token** (32 hex characters). Errors:
 ### B. Build the server
 
 ```bash
-go build -o bin/moodle-mcp ./cmd/moodle-mcp
+go build -o bin/fhj-study-mcp ./cmd/fhj-study-mcp
 ```
 
-On Windows: `go build -o bin\moodle-mcp.exe .\cmd\moodle-mcp`. Without Go, download
-`moodle-mcp-<os>-<arch>` from the [latest release](https://github.com/armenbarseghyan/moodle-mcp/releases/latest)
+On Windows: `go build -o bin\fhj-study-mcp.exe .\cmd\fhj-study-mcp`. Without Go, download
+`fhj-study-mcp-<os>-<arch>` from the [latest release](https://github.com/armenbarseghyan/fhj-study-mcp/releases/latest)
 into `bin/` (on macOS/Linux: `chmod +x` it).
 
 ### C. Register it
@@ -191,20 +191,20 @@ into `bin/` (on macOS/Linux: `chmod +x` it).
 Use the **absolute** path to the binary (see Troubleshooting, *ENOENT*):
 
 ```bash
-claude mcp add moodle --scope user -e MOODLE_URL=https://moodle.fh-joanneum.at -e MOODLE_TOKEN=<token> -- /Users/you/moodle-mcp/bin/moodle-mcp
+claude mcp add fhj --scope user -e MOODLE_URL=https://moodle.fh-joanneum.at -e MOODLE_TOKEN=<token> -- /Users/you/fhj-study-mcp/bin/fhj-study-mcp
 ```
 
-Check with `claude mcp get moodle` — it should say **Connected** — and restart Claude Code.
+Check with `claude mcp get fhj` — it should say **Connected** — and restart Claude Code.
 
 **Codex** — the same with `--env`, or add it to `~/.codex/config.toml`:
 
 ```bash
-codex mcp add moodle --env MOODLE_URL=https://moodle.fh-joanneum.at --env MOODLE_TOKEN=<token> -- /Users/you/moodle-mcp/bin/moodle-mcp
+codex mcp add fhj --env MOODLE_URL=https://moodle.fh-joanneum.at --env MOODLE_TOKEN=<token> -- /Users/you/fhj-study-mcp/bin/fhj-study-mcp
 ```
 
 ```toml
 [mcp_servers.moodle]
-command = "/Users/you/moodle-mcp/bin/moodle-mcp"
+command = "/Users/you/fhj-study-mcp/bin/fhj-study-mcp"
 env = { MOODLE_URL = "https://moodle.fh-joanneum.at", MOODLE_TOKEN = "<token>" }
 ```
 
@@ -217,8 +217,8 @@ Skills: link (or copy) every folder of `skills/` into `~/.claude/skills/` (Claud
 ```json
 {
   "mcpServers": {
-    "moodle": {
-      "command": "/Users/you/moodle-mcp/bin/moodle-mcp",
+    "fhj": {
+      "command": "/Users/you/fhj-study-mcp/bin/fhj-study-mcp",
       "env": { "MOODLE_URL": "https://moodle.fh-joanneum.at", "MOODLE_TOKEN": "<token>" }
     }
   }
@@ -233,6 +233,9 @@ Add them as further `-e NAME=value` when registering.
 |---|---|---|
 | `MOODLE_DOWNLOAD_DIR` | `~/Downloads/moodle` | where downloaded files and dashboards go |
 | `MOODLE_LOG_LEVEL` | `info` | `debug` for troubleshooting (logs never contain the token) |
+| `FHJ_TIMETABLE` | — | timetable search for the class timetable, e.g. `dat26` |
+| `FHJ_TIMETABLE_GROUPS` | all groups | your groups, comma-separated, e.g. `Gruppe 2` |
+| `FHJ_TZ` | this computer's zone | time zone for dates, e.g. `Europe/Vienna` |
 
 ---
 
@@ -258,11 +261,11 @@ The server crashed at startup and the client doesn't show why. Run the binary by
 same variables and read what it prints on stderr:
 
 ```bash
-MOODLE_URL=https://moodle.fh-joanneum.at MOODLE_TOKEN=<token> ~/moodle-mcp/bin/moodle-mcp
+MOODLE_URL=https://moodle.fh-joanneum.at MOODLE_TOKEN=<token> ~/fhj-study-mcp/bin/fhj-study-mcp
 ```
 
 ```powershell
-$env:MOODLE_URL = "https://moodle.fh-joanneum.at"; $env:MOODLE_TOKEN = "<token>"; & "$HOME\moodle-mcp\bin\moodle-mcp.exe"
+$env:MOODLE_URL = "https://moodle.fh-joanneum.at"; $env:MOODLE_TOKEN = "<token>"; & "$HOME\fhj-study-mcp\bin\fhj-study-mcp.exe"
 ```
 
 If it starts fine it waits silently for input (stop it with Ctrl+C) — then the problem is the
@@ -270,7 +273,7 @@ registration (path, variables): run the setup again.
 
 ### `ENOENT` / "command not found" when the client starts the server
 
-Claude Code and Codex start MCP servers with a reduced `PATH`, so a bare `moodle-mcp` or a relative
+Claude Code and Codex start MCP servers with a reduced `PATH`, so a bare `fhj-study-mcp` or a relative
 path is not found even if it works in your terminal. Register the **absolute** path — the setup
 script always does.
 
@@ -294,7 +297,8 @@ through the checks.
 
 ## Privacy
 
-- The server runs on **your** computer and talks only to `moodle.fh-joanneum.at`.
+- The server runs on **your** computer and talks only to `moodle.fh-joanneum.at` and, for the
+  class timetable, to the public `almaty.fh-joanneum.at` (only your search, e.g. `dat26`, no token).
 - What you ask about (deadlines, file contents, grades) is sent to Claude as part of the
   conversation, like anything else you paste into a chat.
 - Downloaded files stay in `MOODLE_DOWNLOAD_DIR` on your machine.

@@ -1,11 +1,11 @@
-# moodle-mcp — data architecture
+# fhj-study-mcp — data architecture
 
 Status: agreed 2026-10-02.
 
 ## 1. Layers and the dependency rule
 
 ```
-            ┌──────────────────────────── cmd/moodle-mcp ───────────────────────────┐
+            ┌──────────────────────────── cmd/fhj-study-mcp ───────────────────────────┐
             │ env → Config → moodle.Client → cached Source → study.Service →        │
             │ tools.Register(mcp.Server) → transport (stdio; stage 2: streamable HTTP)│
             └───────────────────────────────────────────────────────────────────────┘
@@ -14,7 +14,7 @@ Status: agreed 2026-10-02.
         │
   internal/study    use cases: aggregation, merge, resolution, error policy.  Pure logic.
         │      └──► internal/render   domain models → markdown (no I/O)
-        │      └──► internal/textfmt  Vienna dates, "in N days", HTML → text, message printer
+        │      └──► internal/textfmt  dates in the display zone, "in N days", HTML → text, message printer
         ▼
   study.Source (interface) ◄── internal/cache.Source (decorator: TTL + singleflight)
         ▲                               │
@@ -131,7 +131,7 @@ a line such as "_Cached data from 7 min ago; use refresh=true for fresh data._" 
 
 ## 4. Domain models (internal/study)
 
-All times are stored as `time.Time` in Europe/Vienna, strings are already free of HTML, empty
+All times are stored as absolute `time.Time` instants (shown in the display zone), strings are already free of HTML, empty
 means "do not output".
 
 ```go
@@ -143,7 +143,8 @@ type Item struct { CMID int; Kind, Name, Description, URL string; Files []File; 
 type File struct { Name, URL string /* browser URL: /pluginfile.php/… without /webservice and without token */; Size int64; MIME string }
 
 type Deadline struct {
-    Key      DeadlineKey   // {Module string; Instance int}: deduplication key
+    Key      DeadlineKey   // {Module string; CMID int}: deduplication key (course-module id)
+    Instance int           // activity id (assignid / quizid) for status calls; 0 until known
     Course   CourseRef
     Title, Kind, URL string
     Due      time.Time     // final due date after all rules
@@ -167,13 +168,14 @@ Past rule: `hidden || completed || (!End.IsZero() && End < now)`.
 
 ### moodle_deadlines(days=14, include_overdue=true, refresh)
 ```
-window = [now, end of day (now + days) in Vienna]
+window = [now, end of day (now + days) in the display zone]
 overdueWindow = [now − 7d, now)                       ← only for NOT submitted assign
         ┌─ ActionEvents(window.from − 7d, window.to) ──┐
 parallel┤                                              ├→ Merge → [assign: SubmissionStatus ×N (≤5)] → filter → sort → render
         └─ Assignments(activeIDs)  (one call) ─────────┘
 ```
-Merge rules (key `(modulename, instance)`; for assign `instance == assignment.id`):
+Merge rules (key `(modulename, cmid)`: a calendar event's `instance` field is the **course-module id**,
+not the activity id; an assignment reports it as `cmid`):
 1. A calendar event and an assignment with the same key produce one entry. Title and URL come from
    the calendar (it accounts for overrides), the course from the assignment.
 2. **Due date**: `extensionduedate` from the submission status > calendar `timesort` > assignment `duedate`.
@@ -181,7 +183,10 @@ Merge rules (key `(modulename, instance)`; for assign `instance == assignment.id
 3. An assignment **without an event** is kept. This matters: the assign action event disappears after
    submission, and without the second source a submitted assignment would simply vanish from the list.
 4. `duedate == 0` (no due date) is not a deadline and is dropped.
-5. Non-assign events (quiz, choice, …) get status `NotApplicable`; no submission is requested for them.
+5. Status is requested with the **activity id** only: assignments take it from `mod_assign_get_assignments`;
+   calendar-only quizzes and assignments look it up in the (cached) course contents (`module.id` → `module.instance`).
+   If it cannot be found, the status stays unknown — a cmid is never sent as `assignid`/`quizid`.
+   Other events (choice, …) get status `NotApplicable`.
 6. "No access rights" `warnings` become a footnote "Hidden or not yet available: N assignments."
 
 Status: `lastattempt.submission` (or `teamsubmission` if team submissions are enabled) → `status`:
@@ -244,7 +249,13 @@ parse → host == host(MOODLE_URL)? otherwise REFUSE (the token never goes to a 
       → write to a temp file in dest → fsync → rename (atomic, no broken files)
 ```
 - `dest`: empty → `$MOODLE_DOWNLOAD_DIR` or `~/Downloads/moodle`. If `dest` is an existing
-  directory or ends with `/`, the file is placed inside it. Otherwise `dest` is treated as the full file path.
+  directory, ends with `/`, or does not exist and has no extension, the file is placed inside it.
+  Otherwise `dest` is treated as the full file path.
+- `dest` must lie inside the download directory or in `~/Desktop`, `~/Documents`, `~/Downloads`
+  (an allowlist, `moodle.CheckDest`): no hidden files or folders, no `WindowsPowerShell`/`PowerShell`
+  profile folders, symlinks resolved, Windows junctions (`os.ModeIrregular`, which `EvalSymlinks`
+  does not follow since Go 1.23) refused. Moodle text reaches
+  the model, so a prompt in a course page must not be able to drop a file into a config or autostart location.
 - If the file already exists: when size and `Last-Modified` match, "already downloaded" is returned;
   otherwise the file is written as `name (1).ext`.
 - sanitize: base name only, no `..`, `/`, control characters, length ≤ 200.
@@ -254,12 +265,29 @@ parse → host == host(MOODLE_URL)? otherwise REFUSE (the token never goes to a 
 `SiteInfo` → name, login, site, version, number of functions. Plus a **check of which
 functions the server needs are missing**. This is the first tool for diagnostics.
 
+### fhj_timetable(days=7, query, groups, refresh)
+Classes are not in Moodle. `internal/timetable` reads the FH timetable's documented JSON interface
+(`https://almaty.fh-joanneum.at/stundenplan/json.php?q=…&start=…&end=…`, fixed URL, own HTTP client,
+no token). Observed behaviour it relies on:
+- `start` and `end` are whole days, `end` inclusive; times are Vienna wall clock without offset.
+- A search without results answers **HTTP 500 with an empty body and `application/json`**; that
+  exact shape means "no events", any other non-200 is `ErrUnavailable`.
+- The `-group:` exclusion operator does not work through `json.php`, so groups are filtered in
+  the tool, using `className` (`timetable_group_<group>`), not the title.
+- The title is split by syntax only: `<course> (-<number>) (<type> (<XX>))`, people, group,
+  optional note (`.`/`-`), room with a programme suffix. Titles without the course number
+  (exams) are kept whole.
+
+Cached 1 h (the iCal feed announces `X-PUBLISHED-TTL:PT1H`). The tool works without a Moodle
+token (`InitErr` does not apply). The fixture is synthetic: lecturer names stay out of the repo.
+
 ## 6. Time and text (internal/textfmt)
 
-- `Vienna` is loaded via `time.LoadLocation`. `time/tzdata` is embedded in the binary so
+- Dates are shown in the display zone `textfmt.Zone`: `FHJ_TZ` if set, otherwise the computer's zone
+  (in Graz: Vienna; abroad: local time); tests keep the default, Vienna. `time/tzdata` is embedded in the binary so
   it does not depend on the system time zone database.
-- `Date(t)` → `2026-10-07 17:15 (Wednesday)`.
-- `Relative(t, now)` counts **calendar days in Vienna**, not 24 h periods:
+- `Date(t)` → `2026-10-07 17:15 CEST (Wednesday)`: the abbreviation is always shown.
+- `Relative(t, now)` counts **calendar days in the display zone**, not 24 h periods:
   under 1 h → "in 40 min", same day → "today, in 3 h", 1 day → "tomorrow",
   N days → "in N days" (singular "in 1 day" via the plural rules below).
   In the past: "yesterday", "3 days ago".
@@ -339,6 +367,7 @@ The main way to work with materials is **a link the user opens in the browser**
 | `MOODLE_TOKEN` | yes | — |
 | `MOODLE_DOWNLOAD_DIR` | no | `~/Downloads/moodle` |
 | `MOODLE_LOG_LEVEL` | no | `info` |
+| `FHJ_TZ` | no | this computer's zone |
 
 Moodle is **not called** at startup: only the presence of env vars and URL validity are checked.
 If the server failed at startup, Claude Code would only show "Connection closed".
@@ -348,7 +377,7 @@ The version is set via `-ldflags "-X main.version=…"`.
 ## 11. Files
 
 ```
-cmd/moodle-mcp/main.go            env, graph assembly, stdio
+cmd/fhj-study-mcp/main.go            env, graph assembly, stdio
 internal/moodle/
   client.go        Config, New, Call, retry, semaphore, allowlist
   errors.go        Error, sentinels, IsFatal, classification
@@ -409,7 +438,7 @@ the test fails with a clear message (rather than receiving a 404).
 | textfmt | Date/Relative/plural forms/DST/midnight; StripHTML (table of ~20 cases from real descriptions) | pure |
 | study | ResolveCourse (id, substring, case, umlauts, ambiguity, past); Merge (both sources, calendar only, assign only, due=0, due-date precedence, extension, outside window, overdue); BuildTree with subsections; search/ranking; partial error policy | fake Source, clock `2026-10-02 12:00 Vienna` |
 | render | output of every tool | golden files, `go test ./... -update` |
-| tools (e2e) | 9 tools via `mcp.NewInMemoryTransports()`: list_tools (schemas), call_tool → golden; invalidtoken → `IsError` with a clear text | httptest + real client + in-memory MCP |
+| tools (e2e) | 10 tools via `mcp.NewInMemoryTransports()`: list_tools (schemas), call_tool → golden; invalidtoken → `IsError` with a clear text | httptest + real client + in-memory MCP |
 
 **Makefile**: `build`, `test` (`-race -count=1`), `cover`, `lint` (golangci-lint:
 govet, staticcheck, errcheck, gosec, forbidigo), `golden` (`-update`).
@@ -443,7 +472,7 @@ in `Normalize` failed under parallel calls; it is now created per call.
 
 ## 13. Decisions
 
-1. The "N days" window runs **to the end of the N-th day in Vienna** (calendar days, correct across DST changes),
+1. The "N days" window runs **to the end of the N-th day in the display zone** (calendar days, correct across DST changes),
    not N×24 h: Moodle deadlines are usually at 23:59, and the result does not depend on the hour of the request.
 2. Overdue unsubmitted assignments from the last 7 days are shown (`include_overdue=true`).
 3. Grades are not cached.

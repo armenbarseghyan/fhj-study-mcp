@@ -1,12 +1,12 @@
 ---
 name: moodle-setup
-description: Diagnose and set up the Moodle MCP server (moodle-mcp) — token, connection, available functions, installing and connecting it to Claude Code or Codex, HTTP mode. Use this skill whenever moodle_* tools return an error ("invalid token", "MOODLE_TOKEN not set", "no connection", timeout), when the user says "moodle isn't working", "the moodle mcp won't connect", "how do I renew my token", "how do I connect moodle to claude", "connect moodle to codex", "Moodle geht nicht", or when no moodle_* tools are available in the session at all.
-allowed-tools: mcp__moodle__moodle_whoami
+description: Diagnose and set up the Moodle MCP server (fhj-study-mcp) — token, connection, available functions, installing and connecting it to Claude Code or Codex, HTTP mode. Use this skill whenever moodle_* tools return an error ("invalid token", "MOODLE_TOKEN not set", "no connection", timeout), when the user says "moodle isn't working", "the moodle mcp won't connect", "how do I renew my token", "how do I connect moodle to claude", "connect moodle to codex", "Moodle geht nicht", or when no moodle_* tools are available in the session at all.
+allowed-tools: mcp__fhj__moodle_whoami
 ---
 
-# Diagnosing moodle-mcp
+# Diagnosing fhj-study-mcp
 
-The server is a read-only Go binary (`moodle-mcp`) that reads `MOODLE_URL` and `MOODLE_TOKEN`
+The server is a read-only Go binary (`fhj-study-mcp`) that reads `MOODLE_URL` and `MOODLE_TOKEN`
 from its environment. It works with Claude Code and with Codex. Nearly every problem is the
 token, the network or the client's registration. Go from simple to complex and tell the user what each step showed.
 
@@ -18,23 +18,28 @@ If there are no `moodle_*` tools in the session, the server is not registered or
 start. Suggest the user runs (run it yourself only if you have a shell and they agree):
 
 ```bash
-claude mcp get moodle      # Claude Code: also says whether it connects
-codex mcp get moodle       # Codex: shows the command and env (it doesn't start the server)
+claude mcp get fhj      # Claude Code: also says whether it connects
+codex mcp get fhj       # Codex: shows the command and env (it doesn't start the server)
 ```
 
 - **Not registered, or anything about the token** — the fix is the setup script in the
-  repository folder. It builds the server, gets the token, checks it, and registers the
+  repository folder. Ask its questions here first, in one message, so the terminal only asks
+  for the FH login: (1) Claude Code, Codex or both — only if both are installed; (2) the
+  programme code and year for the class timetable, e.g. `dat26` (course names like
+  `DAT_WS2026` hint at it; "skip" is fine); (3) optionally the groups, e.g. `Gruppe 2`. Then give
+  one command with the answers: `./setup.sh --claude --timetable dat26 --groups "Gruppe 2"`
+  (Windows: `-Claude -Timetable dat26 -Groups "Gruppe 2"`; `--timetable ""` skips the timetable). It builds the server, gets the token, checks it, and registers the
   absolute path. The user runs it in their own terminal because it asks for the FH password,
   which must never go into the chat:
   - macOS / Linux (any shell): `./setup.sh`
   - Windows: `powershell -ExecutionPolicy Bypass -File .\setup.ps1`
 
-  No repository yet: `git clone https://github.com/armenbarseghyan/moodle-mcp.git`, then the
+  No repository yet: `git clone https://github.com/armenbarseghyan/fhj-study-mcp.git`, then the
   same. By default it sets up every installed client; `--claude` / `--codex`
   (`-Claude` / `-Codex`) pick one. Restart the client afterwards.
 - **`✘ Failed to connect` / `CONNECTION_CLOSED` with no details** — the binary crashed at
   startup. Have the user run it by hand with the same variables. The error is on stderr:
-  `MOODLE_URL=https://moodle.fh-joanneum.at MOODLE_TOKEN=<token> <path>/bin/moodle-mcp`.
+  `MOODLE_URL=https://moodle.fh-joanneum.at MOODLE_TOKEN=<token> <path>/bin/fhj-study-mcp`.
   If it starts and waits silently, the binary is fine and the registration is wrong: re-run
   the setup.
 - **`ENOENT` / command not found** — registered with a relative path or bare name. Claude Code and Codex
@@ -85,8 +90,8 @@ there instead of improvising. Never ask for the password or the token in the cha
 ## HTTP mode (on request)
 
 ```bash
-MCP_HTTP_TOKEN=<secret> <path>/bin/moodle-mcp -http 127.0.0.1:8765
-claude mcp add moodle-http --transport http http://127.0.0.1:8765/mcp --header "Authorization: Bearer <secret>"
+MCP_HTTP_TOKEN=<secret> <path>/bin/fhj-study-mcp -http 127.0.0.1:8765
+claude mcp add fhj-http --transport http http://127.0.0.1:8765/mcp --header "Authorization: Bearer <secret>"
 ```
 
 Without `MCP_HTTP_TOKEN` the server only listens on localhost — by design.
@@ -95,3 +100,10 @@ Without `MCP_HTTP_TOKEN` the server only listens on localhost — by design.
 
 Never print the token, never ask the user to paste it into the chat, never write it into
 project files. If the user did send it, recommend issuing a new one.
+
+## Class timetable
+
+`fhj_timetable` reads the public FH timetable (`almaty.fh-joanneum.at`), not Moodle; it needs no
+token. "No timetable search is set" means `FHJ_TIMETABLE` is missing: re-run the setup and enter
+the programme code and year (e.g. `dat26`), optionally the groups (`Gruppe 2`). "Not available"
+is the timetable site itself — check https://almaty.fh-joanneum.at/stundenplan/ in the browser.

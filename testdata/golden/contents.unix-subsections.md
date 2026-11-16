@@ -10,3 +10,6 @@ The main goal of this part of the lecture is to make you familiar with the usage
   We will cover the following topics · DME | OpenSSH (https://pages.itplus.fh-joanneum.at/t00000/dme/linux/remote/#openssh): Login to remove VM · TLCL | Chapter 1: What is the Shell? · TLCL | Chapter…
   - [Screenrecording - Part 1](https://moodle.test/mod/lti/view.php?id=179657) · external tool
   - [Screenrecording - Part 2](https://moodle.test/mod/lti/view.php?id=179658) · external tool
+
+### Quizzes
+- [Quiz LaTeX Basics](https://moodle.test/mod/quiz/view.php?id=190077) · quiz

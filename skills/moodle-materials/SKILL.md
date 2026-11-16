@@ -1,7 +1,7 @@
 ---
 name: moodle-materials
 description: Find course material in Moodle (FH JOANNEUM) and answer from its content — slides, lectures, PDFs, how-tos (VPN, SSH, GitLab, VMs, lab PCs), templates, archives, course pages. Use this skill whenever the user looks for something from their courses or asks "how do I X" where the answer likely sits in course material, in any language — "where is the lecture on…", "find the slides", "how do I connect to the VM / VPN / server", "what was in lecture R1", "is there a git guide?", "wo finde ich die Folien", "Anleitung VPN" — even if Moodle is not mentioned. Not for deadlines (moodle-briefing) or for working through one assignment (moodle-assignment).
-allowed-tools: mcp__moodle__moodle_search, mcp__moodle__moodle_course_contents, mcp__moodle__moodle_courses, mcp__moodle__moodle_download, Read
+allowed-tools: mcp__fhj__moodle_search, mcp__fhj__moodle_course_contents, mcp__fhj__moodle_courses, Read
 ---
 
 # Finding material and answering from it

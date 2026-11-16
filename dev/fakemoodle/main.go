@@ -1,5 +1,5 @@
 // Command fakemoodle serves the test fixture world (moodletest.World) over
-// HTTP, for trying moodle-mcp and its skills without touching the real site.
+// HTTP, for trying fhj-study-mcp and its skills without touching the real site.
 // Development only; it is not part of the server.
 //
 //	go run ./dev/fakemoodle -url-file /tmp/fake.url
@@ -17,7 +17,7 @@ import (
 	"os/signal"
 	"syscall"
 
-	"github.com/armenbarseghyan/moodle-mcp/internal/moodletest"
+	"github.com/armenbarseghyan/fhj-study-mcp/internal/moodletest"
 )
 
 type logReporter struct{}

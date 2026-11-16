@@ -1,7 +1,7 @@
 ---
 name: moodle-grades
 description: Grades from Moodle (FH JOANNEUM) — scores, percentages, teacher feedback, what is still ungraded, how a course is going. Use this skill whenever the user asks about grades or performance, in any language — "how are my grades", "what did I get for R1", "what did the teacher write", "are grades out yet?", "Noten", "wie sind meine Noten" — even if Moodle is not named. Not for deadlines (moodle-briefing).
-allowed-tools: mcp__moodle__moodle_grades, mcp__moodle__moodle_courses, Read, Glob
+allowed-tools: mcp__fhj__moodle_grades, mcp__fhj__moodle_courses, Read, Glob
 ---
 
 # Grades

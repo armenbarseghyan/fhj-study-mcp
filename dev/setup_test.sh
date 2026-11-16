@@ -117,7 +117,7 @@ run_setup token-env MOODLE_TOKEN="$TOKEN" || rc=$?
 check "succeeds with MOODLE_TOKEN" "$rc"
 grep -q "signed in as Max Student (s00000)" "$WORK/token-env/out"
 check "verifies the token against the site" $?
-grep -q "^mcp add moodle -s user -e MOODLE_URL=$URL -e MOODLE_TOKEN=$TOKEN -- $ROOT/bin/moodle-mcp\$" "$WORK/token-env/calls.log"
+grep -q "^mcp add fhj -s user -e MOODLE_URL=$URL -e MOODLE_TOKEN=$TOKEN -- $ROOT/bin/fhj-study-mcp\$" "$WORK/token-env/calls.log"
 check "registers the absolute binary path with both variables" $?
 if grep -q "$TOKEN" "$WORK/token-env/out"; then rc=1; else rc=0; fi
 check "never prints the token" "$rc"
@@ -163,7 +163,7 @@ check "explains how to debug a server that does not connect" $?
 rc=0
 STUBS="$WORK/stub:$WORK/stub-codex" run_setup codex-only MOODLE_TOKEN="$TOKEN" -- --codex --no-skills || rc=$?
 check "--codex succeeds" "$rc"
-grep -q "^mcp add moodle --env MOODLE_URL=$URL --env MOODLE_TOKEN=$TOKEN -- $ROOT/bin/moodle-mcp\$" "$WORK/codex-only/codex.log"
+grep -q "^mcp add fhj --env MOODLE_URL=$URL --env MOODLE_TOKEN=$TOKEN -- $ROOT/bin/fhj-study-mcp\$" "$WORK/codex-only/codex.log"
 check "--codex registers the absolute binary path with both variables" $?
 if [ -f "$WORK/codex-only/calls.log" ]; then rc=1; else rc=0; fi
 check "--codex leaves Claude Code alone" "$rc"
@@ -172,8 +172,8 @@ check "--codex leaves Claude Code alone" "$rc"
 rc=0
 STUBS="$WORK/stub:$WORK/stub-codex" run_setup both MOODLE_TOKEN="$TOKEN" -- --skills || rc=$?
 check "default registers with every installed client" "$([ "$rc" -eq 0 ] &&
-	grep -q "^mcp add moodle -s user" "$WORK/both/calls.log" &&
-	grep -q "^mcp add moodle --env" "$WORK/both/codex.log"; echo $?)"
+	grep -q "^mcp add fhj -s user" "$WORK/both/calls.log" &&
+	grep -q "^mcp add fhj --env" "$WORK/both/codex.log"; echo $?)"
 rc=1
 if [ -L "$WORK/both/home/.claude/skills/moodle-setup" ] && [ -L "$WORK/both/home/.agents/skills/moodle-setup" ] &&
 	[ -f "$WORK/both/home/.agents/skills/moodle-briefing/SKILL.md" ]; then rc=0; fi

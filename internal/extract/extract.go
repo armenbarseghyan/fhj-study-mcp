@@ -23,7 +23,7 @@ import (
 	"github.com/ledongthuc/pdf"
 	"golang.org/x/text/unicode/norm"
 
-	"github.com/armenbarseghyan/moodle-mcp/internal/textfmt"
+	"github.com/armenbarseghyan/fhj-study-mcp/internal/textfmt"
 )
 
 // Limits protecting against huge files and zip bombs.

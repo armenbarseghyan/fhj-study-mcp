@@ -28,7 +28,7 @@ const (
 	defaultInFlight  = 5
 	maxBodyBytes     = 32 << 20
 	maxAttempts      = 2 // one retry
-	userAgent        = "moodle-mcp"
+	userAgent        = "fhj-study-mcp"
 )
 
 // Config configures a Client. BaseURL and Token are required.

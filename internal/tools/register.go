@@ -8,13 +8,17 @@ import (
 	"encoding/json"
 	"errors"
 	"log/slog"
+	"slices"
+	"strings"
 	"time"
 
 	"github.com/google/jsonschema-go/jsonschema"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 
-	"github.com/armenbarseghyan/moodle-mcp/internal/render"
-	"github.com/armenbarseghyan/moodle-mcp/internal/study"
+	"github.com/armenbarseghyan/fhj-study-mcp/internal/render"
+	"github.com/armenbarseghyan/fhj-study-mcp/internal/study"
+	"github.com/armenbarseghyan/fhj-study-mcp/internal/textfmt"
+	"github.com/armenbarseghyan/fhj-study-mcp/internal/timetable"
 )
 
 // Deps are the tools' dependencies.
@@ -23,9 +27,15 @@ type Deps struct {
 	Now     func() time.Time
 	Version string
 	Logger  *slog.Logger
-	// InitErr, when set, is returned by every tool: the server still starts,
-	// so the user sees a clear message instead of "Connection closed".
+	// InitErr, when set, is returned by every Moodle tool: the server still
+	// starts, so the user sees a clear message instead of "Connection closed".
 	InitErr error
+
+	// Timetable reads the FH class timetable; nil leaves fhj_timetable out.
+	// It does not need Moodle, so InitErr does not apply to it.
+	Timetable       *timetable.Client
+	TimetableQuery  string   // FHJ_TIMETABLE, e.g. "dat26"
+	TimetableGroups []string // FHJ_TIMETABLE_GROUPS, e.g. ["Gruppe 2"]
 }
 
 // Instructions are sent to the client on initialisation.
@@ -33,8 +43,9 @@ const Instructions = `Read-only access to an FH JOANNEUM student's Moodle.
 What is due and when: moodle_deadlines. What teachers posted: moodle_announcements (check first, it is often the most urgent).
 What changed lately — new or updated files, announcements, grades — in one call: moodle_whats_new.
 Find material without knowing the course: moodle_search; a course's structure: moodle_course_contents.
+When and where classes are (not in Moodle): fhj_timetable.
 Links in answers open in the user's browser, where they are signed in to Moodle — pass them on as they are.
-Use moodle_download only when a file is needed locally. All dates are Europe/Vienna.`
+Use moodle_download only when a file is needed locally. Every date carries its time zone (the user's own); keep it when you repeat a time.`
 
 // Register adds all tools to s.
 func Register(s *mcp.Server, d Deps) {
@@ -157,6 +168,53 @@ func Register(s *mcp.Server, d Deps) {
 		r, err := d.Service.WhoAmI(ctx)
 		return render.WhoAmI(r, d.Version), err
 	})
+
+	if d.Timetable != nil {
+		td := d
+		td.InitErr = nil
+		add(s, td, &mcp.Tool{
+			Name:  "fhj_timetable",
+			Title: "Class timetable",
+			Description: "When and where classes are: lectures, exercises and exams of the next N days from the FH JOANNEUM " +
+				"timetable (not in Moodle) — time, course, type, lecturer, group, room or MS-Teams. Group-specific classes " +
+				"are labelled; groups filters them.",
+			Annotations: ro,
+			InputSchema: schema[TimetableIn](map[string]prop{"days": {Default: 7, Min: ptr(1.0), Max: ptr(120.0)}}),
+		}, func(ctx context.Context, in TimetableIn) (string, error) {
+			now := d.Now()
+			v := render.TimetableView{Query: in.Query, Groups: in.Groups,
+				From: textfmt.DayStart(now, 0), To: textfmt.DayStart(now, orDefault(in.Days, 7))}
+			if v.Query == "" {
+				v.Query = d.TimetableQuery
+			}
+			// The configured groups belong to the configured programme only.
+			if len(v.Groups) == 0 && strings.EqualFold(strings.TrimSpace(v.Query), d.TimetableQuery) {
+				v.Groups = d.TimetableGroups
+			}
+			evs, at, err := d.Timetable.Events(ctx, v.Query, v.From, v.To, in.Refresh)
+			if err != nil {
+				return "", err
+			}
+			v.FetchedAt = at
+			for _, e := range evs {
+				switch {
+				case !e.End.After(now):
+					v.Over++
+				case len(v.Groups) > 0 && !e.Everyone() && !hasGroup(v.Groups, e.Group):
+					v.Hidden++
+				default:
+					v.Events = append(v.Events, e)
+				}
+			}
+			return render.Timetable(v, now), nil
+		})
+	}
+}
+
+// hasGroup matches a group name as people type it: "gruppe 1" is "Gruppe 1".
+func hasGroup(groups []string, g string) bool {
+	norm := func(s string) string { return strings.Join(strings.Fields(s), " ") }
+	return slices.ContainsFunc(groups, func(x string) bool { return strings.EqualFold(norm(x), norm(g)) })
 }
 
 // add registers a tool whose handler returns markdown. Errors become

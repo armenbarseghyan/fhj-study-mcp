@@ -5,7 +5,7 @@ Usage:
     dev/skill-evals/run_evals.py <workspace>/iteration-N [--only name,name] [--jobs 4]
 
 Each eval runs twice: in a work dir whose .claude/skills links to ./skills (with_skill)
-and in an empty work dir (without_skill). Both see only the moodle-mcp server pointed at
+and in an empty work dir (without_skill). Both see only the fhj-study-mcp server pointed at
 the fake Moodle (dev/fakemoodle), never the real site, and only project settings.
 Results: <iteration>/<eval-name>/<config>/{outputs/answer.md, outputs/*.html,
 transcript.jsonl, timing.json} plus eval_metadata.json per eval.
@@ -22,7 +22,7 @@ import time
 
 REPO = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
 EVALS = os.path.join(os.path.dirname(os.path.abspath(__file__)), "evals.json")
-ALLOWED = ["mcp__moodle", "Read", "Write", "Glob", "Grep", "Skill",
+ALLOWED = ["mcp__fhj", "Read", "Write", "Glob", "Grep", "Skill",
            "Bash(python3:*)", "Bash(unzip:*)", "Bash(mkdir:*)", "Bash(ls:*)", "Bash(cat:*)"]
 
 
@@ -55,7 +55,7 @@ def run_one(ev, config, base_url, token, tmp, out_root):
     dl_dir = os.path.join(tmp, f"dl-{ev['name']}-{config}")
     os.makedirs(dl_dir, exist_ok=True)
     tok = "revoked-token-000" if ev.get("token") == "revoked" else token
-    mcp = {"mcpServers": {"moodle": {"command": os.path.join(REPO, "bin", "moodle-mcp"),
+    mcp = {"mcpServers": {"fhj": {"command": os.path.join(REPO, "bin", "fhj-study-mcp"),
                                       "env": {"MOODLE_URL": base_url, "MOODLE_TOKEN": tok,
                                               "MOODLE_DOWNLOAD_DIR": dl_dir, "MOODLE_LOG_LEVEL": "warn"}}}}
     cfg = os.path.join(tmp, f"mcp-{ev['name']}-{config}.json")

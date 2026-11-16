@@ -1,7 +1,7 @@
 ---
 name: moodle-dashboard
 description: Visual study dashboard from Moodle (FH JOANNEUM) — a polished HTML page with a calendar, "urgent" cards, a day-by-day deadline timeline with submission status, new course material, teacher announcements and grades with feedback, light and dark theme. Use this skill whenever the user wants to see their studies visually, in any language — "make a dashboard", "show my week as a page", "visualise my deadlines", "study overview page", "Übersicht als Seite" — or asks for a briefing as a page rather than text. For a plain text "what's due" use moodle-briefing.
-allowed-tools: mcp__moodle__moodle_whats_new, mcp__moodle__moodle_announcements, mcp__moodle__moodle_deadlines, mcp__moodle__moodle_grades, mcp__moodle__moodle_courses, Bash(python3:*), Bash(open:*), Write, Read, Glob
+allowed-tools: mcp__fhj__moodle_whats_new, mcp__fhj__moodle_announcements, mcp__fhj__moodle_deadlines, mcp__fhj__moodle_grades, mcp__fhj__moodle_courses, Read, Glob
 ---
 
 # Visual dashboard
@@ -64,7 +64,7 @@ sections are empty lists or absent; the template shows "nothing here" on its own
 ```
 
 Filling it in well is what makes the page useful:
-- `today` and each item's `date` (`YYYY-MM-DD`, Vienna) drive the calendar grid at the top: whole
+- `today` and each item's `date` (`YYYY-MM-DD`, in the time zone the tools show) drive the calendar grid at the top: whole
   weeks around today and all deadlines, today highlighted, each deadline as a coloured chip.
 - `deadlines` — chronological, grouped by an identical `day` value. `kind` in the user's
   language ("quiz"). `status`: `todo` (not submitted / not attempted yet — shown neutral, not

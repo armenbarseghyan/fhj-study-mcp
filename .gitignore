@@ -5,7 +5,7 @@
 docs/site-info.json
 # build output
 /bin/
-/moodle-mcp
+/fhj-study-mcp
 *.test
 coverage.out
 

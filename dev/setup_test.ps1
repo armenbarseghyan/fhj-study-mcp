@@ -135,14 +135,14 @@ exit /b 0
 	}
 
 	Write-Host "setup.ps1 end-to-end with $Shell (fake Moodle at $Url)"
-	$bin = Join-Path (Join-Path $Root 'bin') $(if ($onWindows) { 'moodle-mcp.exe' } else { 'moodle-mcp' })
+	$bin = Join-Path (Join-Path $Root 'bin') $(if ($onWindows) { 'fhj-study-mcp.exe' } else { 'fhj-study-mcp' })
 
 	# 1. Token from the environment: build, verify, register by absolute path.
 	$r = Run-Setup 'token-env' @{ MOODLE_TOKEN = $Token }
 	Check 'succeeds with MOODLE_TOKEN' ($r.Code -eq 0)
 	Check 'verifies the token against the site' ($r.Out -match 'signed in as Max Student \(s00000\)')
 	Check 'registers the absolute binary path with both variables' `
-		($r.Calls.Contains("mcp add moodle -s user -e MOODLE_URL=$Url -e MOODLE_TOKEN=$Token -- $bin"))
+		($r.Calls.Contains("mcp add fhj -s user -e MOODLE_URL=$Url -e MOODLE_TOKEN=$Token -- $bin"))
 	Check 'never prints the token' (-not $r.Out.Contains($Token))
 
 	# 2. token+privatetoken pasted together (64 characters).
@@ -162,12 +162,12 @@ exit /b 0
 	$r = Run-Setup 'codex-only' @{ MOODLE_TOKEN = $Token } @('-Codex', '-NoSkills') @($stub, $stubCodex)
 	Check '-Codex succeeds' ($r.Code -eq 0)
 	Check '-Codex registers the absolute binary path with both variables' `
-		($r.Codex.Contains("mcp add moodle --env MOODLE_URL=$Url --env MOODLE_TOKEN=$Token -- $bin"))
+		($r.Codex.Contains("mcp add fhj --env MOODLE_URL=$Url --env MOODLE_TOKEN=$Token -- $bin"))
 	Check '-Codex leaves Claude Code alone' (-not $r.Calls)
 
 	# 6. Default: every installed client, skills linked for each.
 	$r = Run-Setup 'both' @{ MOODLE_TOKEN = $Token } @('-Skills') @($stub, $stubCodex)
-	Check 'default registers with every installed client' (($r.Code -eq 0) -and $r.Calls.Contains('mcp add moodle') -and $r.Codex.Contains('mcp add moodle'))
+	Check 'default registers with every installed client' (($r.Code -eq 0) -and $r.Calls.Contains('mcp add fhj') -and $r.Codex.Contains('mcp add fhj'))
 	Check 'skills linked for Claude Code and Codex' `
 		((Test-Path (Join-Path $r.Home '.claude/skills/moodle-setup/SKILL.md')) -and (Test-Path (Join-Path $r.Home '.agents/skills/moodle-briefing/SKILL.md')))
 	Check 'tells which clients to restart' ($r.Out -match 'Restart Claude Code and Codex')

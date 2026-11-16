@@ -1,4 +1,4 @@
-module github.com/armenbarseghyan/moodle-mcp
+module github.com/armenbarseghyan/fhj-study-mcp
 
 go 1.26.0
 

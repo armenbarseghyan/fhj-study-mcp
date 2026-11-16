@@ -8,9 +8,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/armenbarseghyan/moodle-mcp/internal/extract"
-	"github.com/armenbarseghyan/moodle-mcp/internal/moodle"
-	"github.com/armenbarseghyan/moodle-mcp/internal/study"
+	"github.com/armenbarseghyan/fhj-study-mcp/internal/extract"
+	"github.com/armenbarseghyan/fhj-study-mcp/internal/moodle"
+	"github.com/armenbarseghyan/fhj-study-mcp/internal/study"
 )
 
 // TTLs per data kind (docs/ARCHITECTURE.md §3).

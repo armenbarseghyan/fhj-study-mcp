@@ -1,10 +1,10 @@
-BIN     := bin/moodle-mcp
+BIN     := bin/fhj-study-mcp
 VERSION ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo dev)
 
 .PHONY: build test setup-test cover lint golden fuzz dev install-skills uninstall-skills
 
 build:
-	go build -trimpath -ldflags "-s -w -X main.version=$(VERSION)" -o $(BIN) ./cmd/moodle-mcp
+	go build -trimpath -ldflags "-s -w -X main.version=$(VERSION)" -o $(BIN) ./cmd/fhj-study-mcp
 
 test:
 	go test -race -count=1 ./...

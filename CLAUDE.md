@@ -1,4 +1,4 @@
-# moodle-mcp — working rules
+# fhj-study-mcp — working rules
 
 Read-only Moodle MCP server in Go, plus Claude skills under `skills/`. High bar: small, obvious, tested.
 

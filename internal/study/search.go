@@ -6,8 +6,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/armenbarseghyan/moodle-mcp/internal/extract"
-	"github.com/armenbarseghyan/moodle-mcp/internal/textfmt"
+	"github.com/armenbarseghyan/fhj-study-mcp/internal/extract"
+	"github.com/armenbarseghyan/fhj-study-mcp/internal/textfmt"
 )
 
 // Search limits.

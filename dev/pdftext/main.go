@@ -1,4 +1,4 @@
-// Command pdftext prints the text moodle-mcp extracts from local files
+// Command pdftext prints the text fhj-study-mcp extracts from local files
 // (the same code that powers moodle_search in_files). Development only.
 //
 //	go run ./dev/pdftext file.pdf [more files]
@@ -9,7 +9,7 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/armenbarseghyan/moodle-mcp/internal/extract"
+	"github.com/armenbarseghyan/fhj-study-mcp/internal/extract"
 )
 
 func main() {

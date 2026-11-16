@@ -1,6 +1,6 @@
 <#
 .SYNOPSIS
-  Build moodle-mcp, get your Moodle token and register the server with Claude Code and/or Codex (Windows).
+  Build fhj-study-mcp, get your Moodle token and register the server with Claude Code and/or Codex (Windows).
 
 .DESCRIPTION
   The Windows counterpart of setup.sh. Safe to re-run: it replaces an existing registration.
@@ -11,6 +11,8 @@
                                                                      Claude Code; default: every
                                                                      one that is installed)
     powershell -ExecutionPolicy Bypass -File .\setup.ps1 -NoSkills
+    powershell -ExecutionPolicy Bypass -File .\setup.ps1 -Claude -Timetable dat26 -Groups "Gruppe 2"
+                                                                     class timetable without asking
 
   Your password is sent only to $MoodleUrl/login/token.php (the endpoint the official
   Moodle app uses) and is not stored. The token ends up only in the clients' configs.
@@ -22,7 +24,9 @@ param(
 	[switch]$NoSkills,
 	[switch]$Claude,
 	[switch]$Codex,
-	[string]$Url
+	[string]$Url,
+	[AllowEmptyString()][string]$Timetable,
+	[string]$Groups
 )
 
 Set-StrictMode -Version 2.0
@@ -30,14 +34,14 @@ $ErrorActionPreference = 'Stop'
 # Windows PowerShell 5.1 on older .NET still offers TLS 1.0 by default.
 [Net.ServicePointManager]::SecurityProtocol = [Net.ServicePointManager]::SecurityProtocol -bor [Net.SecurityProtocolType]::Tls12
 
-$Repo = 'armenbarseghyan/moodle-mcp'
+$Repo = 'armenbarseghyan/fhj-study-mcp'
 $MoodleUrl = if ($Url) { $Url } elseif ($env:MOODLE_URL) { $env:MOODLE_URL } else { 'https://moodle.fh-joanneum.at' }
 $MoodleUrl = $MoodleUrl.TrimEnd('/')
-$ServerName = if ($env:MOODLE_MCP_NAME) { $env:MOODLE_MCP_NAME } else { 'moodle' }
+$ServerName = if ($env:FHJ_MCP_NAME) { $env:FHJ_MCP_NAME } else { 'fhj' }
 $Root = $PSScriptRoot
 # Windows PowerShell 5.1 has no $IsWindows; PowerShell 7 on macOS/Linux runs this too (tests).
 $OnWindows = $env:OS -eq 'Windows_NT'
-$Bin = Join-Path (Join-Path $Root 'bin') $(if ($OnWindows) { 'moodle-mcp.exe' } else { 'moodle-mcp' })
+$Bin = Join-Path (Join-Path $Root 'bin') $(if ($OnWindows) { 'fhj-study-mcp.exe' } else { 'fhj-study-mcp' })
 $SkillMode = if ($Skills) { 'yes' } elseif ($NoSkills) { 'no' } else { 'ask' }
 
 function Step([string]$m) { Write-Host ""; Write-Host "==> $m" }
@@ -74,6 +78,13 @@ if ($Clients.Count -eq 0) {
 	if (-not $Clients) {
 		Die "neither Claude Code ('claude') nor Codex ('codex') is on your PATH. Install one (https://claude.com/claude-code or https://developers.openai.com/codex) and run this script again."
 	}
+	if (@($Clients).Count -eq 2 -and (Interactive)) {
+		$answer = Read-Host '    Both Claude Code and Codex are installed. Set up for: 1) Claude Code  2) Codex  3) both [3]'
+		switch ($answer.Trim()) {
+			'1' { $Clients = @('claude') }
+			'2' { $Clients = @('codex') }
+		}
+	}
 } else {
 	foreach ($c in $Clients) {
 		if (-not (Get-Command $c -ErrorAction SilentlyContinue)) { Die "'$c' is not on your PATH." }
@@ -92,13 +103,13 @@ if (Get-Command go -ErrorAction SilentlyContinue) {
 		if ($LASTEXITCODE -eq 0 -and $v) { $version = $v }
 	}
 	Push-Location $Root
-	try { Native { go build -trimpath -ldflags "-s -w -X main.version=$version" -o $Bin ./cmd/moodle-mcp } }
+	try { Native { go build -trimpath -ldflags "-s -w -X main.version=$version" -o $Bin ./cmd/fhj-study-mcp } }
 	finally { Pop-Location }
 	if ($LASTEXITCODE -ne 0) { Die 'go build failed (the project needs Go 1.26; Go 1.21 or newer downloads it automatically).' }
 	Ok "built $Bin ($version)"
 } else {
 	$arch = if ($env:PROCESSOR_ARCHITECTURE -eq 'ARM64') { 'arm64' } else { 'amd64' }
-	$asset = "moodle-mcp-windows-$arch.exe"
+	$asset = "fhj-study-mcp-windows-$arch.exe"
 	$base = "https://github.com/$Repo/releases/latest/download"
 	Write-Host "    Go is not installed; downloading the latest release ($asset)"
 	$tmp = Join-Path ([IO.Path]::GetTempPath()) ([Guid]::NewGuid())
@@ -174,6 +185,41 @@ $code = Field $site 'errorcode'
 if ($code) { Die "Moodle refused the token ($code). Get a new one by running this script again without MOODLE_TOKEN." }
 Ok "signed in as $(Field $site 'fullname') ($(Field $site 'username'))"
 
+# Class timetable (fhj_timetable): the search and the groups go into the
+# registration. Optional; it works without Moodle data.
+# -Timetable / -Groups (given, even empty) win over the environment and the question.
+$TimetableGiven = $PSBoundParameters.ContainsKey('Timetable')
+if (-not $TimetableGiven) { $Timetable = "$env:FHJ_TIMETABLE" }
+$Timetable = "$Timetable".Trim()
+$TimetableGroups = if ($PSBoundParameters.ContainsKey('Groups')) { "$Groups".Trim() } else { "$env:FHJ_TIMETABLE_GROUPS".Trim() }
+if (-not $Timetable -and -not $TimetableGiven -and (Interactive)) {
+	$Timetable = (Read-Host '    Timetable: your programme code and year, e.g. dat26 (Enter to skip)').Trim()
+	if ($Timetable -and -not $TimetableGroups) {
+		$TimetableGroups = (Read-Host '    Your groups, comma-separated, e.g. Gruppe 2 (Enter to show all groups)').Trim()
+	}
+}
+$ClaudeEnv = @(); $CodexEnv = @()
+if ($Timetable) {
+	$ClaudeEnv += @('-e', "FHJ_TIMETABLE=$Timetable"); $CodexEnv += @('--env', "FHJ_TIMETABLE=$Timetable")
+	if ($TimetableGroups) {
+		$ClaudeEnv += @('-e', "FHJ_TIMETABLE_GROUPS=$TimetableGroups"); $CodexEnv += @('--env', "FHJ_TIMETABLE_GROUPS=$TimetableGroups")
+		Ok "timetable: $Timetable ($TimetableGroups)"
+	} else {
+		Ok "timetable: $Timetable"
+	}
+}
+
+# Before the rename the server was registered as "moodle". Only point it out:
+# the name may belong to something else on this machine.
+$LegacyName = 'moodle'
+function Show-LegacyHint([string]$client, [string]$fix) {
+	if ($ServerName -eq $LegacyName) { return }
+	Native { & $client mcp get $LegacyName 2>$null } | Out-Null
+	if ($LASTEXITCODE -ne 0) { return }
+	Write-Host "    A server named '$LegacyName' is registered too. If it is the old moodle-mcp, remove it," -ForegroundColor DarkGray
+	Write-Host "    or every Moodle tool appears twice:  $fix" -ForegroundColor DarkGray
+}
+
 # Both clients start MCP servers with a reduced PATH: register the absolute path.
 # Arguments go through arrays so PowerShell passes "--" on instead of eating it.
 foreach ($c in $Clients) {
@@ -185,7 +231,7 @@ foreach ($c in $Clients) {
 			Ok "removed the previous '$ServerName' registration"
 		}
 		$addArgs = @('mcp', 'add', $ServerName, '-s', 'user',
-			'-e', "MOODLE_URL=$MoodleUrl", '-e', "MOODLE_TOKEN=$token", '--', $Bin)
+			'-e', "MOODLE_URL=$MoodleUrl", '-e', "MOODLE_TOKEN=$token") + $ClaudeEnv + @('--', $Bin)
 		Native { claude @addArgs } | Out-Null
 		# "claude mcp get" starts the server and reports whether it connects.
 		if ((Native { claude mcp get $ServerName 2>$null } | Out-String) -match 'Connected') {
@@ -195,11 +241,12 @@ foreach ($c in $Clients) {
 				"      `$env:MOODLE_URL = `"$MoodleUrl`"; `$env:MOODLE_TOKEN = `"<token>`"; & `"$Bin`"`n" +
 				"    and read the error it prints (see docs/STUDENT-SETUP.md, Troubleshooting).")
 		}
+		Show-LegacyHint 'claude' "claude mcp remove $LegacyName"
 	} else {
 		Step 'Registering with Codex'
 		# "codex mcp add" replaces an existing entry of the same name.
 		$addArgs = @('mcp', 'add', $ServerName,
-			'--env', "MOODLE_URL=$MoodleUrl", '--env', "MOODLE_TOKEN=$token", '--', $Bin)
+			'--env', "MOODLE_URL=$MoodleUrl", '--env', "MOODLE_TOKEN=$token") + $CodexEnv + @('--', $Bin)
 		Native { codex @addArgs } | Out-Null
 		# "codex mcp get" shows the configuration only; it doesn't start the server.
 		if ((Native { codex mcp get $ServerName 2>$null } | Out-String).Contains("command: $Bin")) {
@@ -207,6 +254,7 @@ foreach ($c in $Clients) {
 		} else {
 			Die "Codex did not save the registration; check: codex mcp get $ServerName"
 		}
+		Show-LegacyHint 'codex' "codex mcp remove $LegacyName"
 	}
 }
 Remove-Variable token, addArgs
