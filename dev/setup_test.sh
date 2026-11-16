@@ -95,18 +95,28 @@ run_setup() {
 		"$ROOT/setup.sh" "$@" >"$dir/out" 2>&1
 }
 
-# Interactive runs need a terminal: drive setup.sh through a pseudo-terminal
-# that answers the username and password prompts.
-# run_interactive NAME USERNAME PASSWORD [SETUP-COMMAND...] (default ./setup.sh)
+# Interactive runs need a terminal: drive setup.sh through a pseudo-terminal.
+# run_pty NAME PROMPT=ANSWER... -- SETUP-COMMAND...: answers the prompts in
+# order (STUBS=... to choose the stub dirs on PATH).
+run_pty() {
+	local name="$1" answers=()
+	shift
+	while [ "$1" != "--" ]; do answers+=("$1"); shift; done
+	shift
+	local dir="$WORK/$name"
+	mkdir -p "$dir/home"
+	env -u MOODLE_TOKEN -u FHJ_TIMETABLE -u FHJ_TIMETABLE_GROUPS HOME="$dir/home" PATH="${STUBS:-$WORK/stub}:$PATH" \
+		STUB_DIR="$dir" MOODLE_URL="$URL" PTY_TIMEOUT=60 \
+		python3 "$ROOT/dev/pty_run.py" "${answers[@]}" -- "$@" >"$dir/out" 2>&1
+}
+
+# run_interactive NAME USERNAME PASSWORD [SETUP-COMMAND...] (default ./setup.sh
+# --claude --no-skills): answers the login and skips the timetable question.
 run_interactive() {
 	local name="$1" username="$2" password="$3"
 	shift 3
 	[ $# -gt 0 ] || set -- "$ROOT/setup.sh" --claude --no-skills
-	local dir="$WORK/$name"
-	mkdir -p "$dir/home"
-	env -u MOODLE_TOKEN HOME="$dir/home" PATH="$WORK/stub:$PATH" STUB_DIR="$dir" MOODLE_URL="$URL" \
-		python3 "$ROOT/dev/pty_run.py" "FH username: =$username" "FH password (hidden): =$password" -- \
-		"$@" >"$dir/out" 2>&1
+	run_pty "$name" "FH username: =$username" "FH password (hidden): =$password" "(Enter to skip)=" -- "$@"
 }
 
 echo "setup.sh end-to-end (fake Moodle at $URL)"
@@ -187,7 +197,32 @@ STUBS="$WORK/none" run_setup no-client MOODLE_TOKEN="$TOKEN" PATH="$WORK/none:/u
 [ "$rc" -ne 0 ] && grep -q "neither Claude Code" "$WORK/no-client/out"
 check "explains that Claude Code or Codex is needed" $?
 
-# 10. setup.ps1's interactive login, when PowerShell 7 is available (PWSH=path or
+# 10. Timetable: flags go into the registration without asking; typed answers too.
+rc=0
+run_setup timetable-flags MOODLE_TOKEN="$TOKEN" -- --claude --no-skills --timetable dat26 --groups "Gruppe 2" || rc=$?
+[ "$rc" -eq 0 ] && grep -q -- "-e FHJ_TIMETABLE=dat26 -e FHJ_TIMETABLE_GROUPS=Gruppe 2 -- " "$WORK/timetable-flags/calls.log"
+check "--timetable/--groups are passed to the registration" $?
+rc=0
+run_pty timetable-typed "FH username: =$USERNAME" "FH password (hidden): =$PASSWORD" "(Enter to skip)=dat26" "show all groups)=gruppe 1" -- \
+	"$ROOT/setup.sh" --claude --no-skills || rc=$?
+[ "$rc" -eq 0 ] && grep -q -- "-e FHJ_TIMETABLE=dat26 -e FHJ_TIMETABLE_GROUPS=gruppe 1 -- " "$WORK/timetable-typed/calls.log"
+check "typed timetable programme and groups are registered" $?
+rc=0
+run_interactive timetable-skipped "$USERNAME" "$PASSWORD" || rc=$?
+[ "$rc" -eq 0 ] && ! grep -q "FHJ_TIMETABLE" "$WORK/timetable-skipped/calls.log"
+check "Enter skips the timetable" $?
+
+# 11. Both clients installed: the setup asks which one; "1" is Claude Code only.
+rc=0
+STUBS="$WORK/stub:$WORK/stub-codex" run_pty choose-client "both [3]: =1" "FH username: =$USERNAME" \
+	"FH password (hidden): =$PASSWORD" "(Enter to skip)=" -- "$ROOT/setup.sh" --no-skills || rc=$?
+[ "$rc" -eq 0 ] && grep -q "^mcp add fhj -s user" "$WORK/choose-client/calls.log" && [ ! -f "$WORK/choose-client/codex.log" ]
+check "asks which client when both are installed" $?
+totals="$(grep -o '\[[0-9]/[0-9]\]' "$WORK/choose-client/out" | cut -d/ -f2 | sort -u | wc -l | tr -d ' ')"
+if [ "$totals" = 1 ]; then rc=0; else rc=1; fi
+check "the step total stays the same from the first step" "$rc"
+
+# 12. setup.ps1's interactive login, when PowerShell 7 is available (PWSH=path or
 # pwsh on PATH). Its other paths are covered by dev/setup_test.ps1.
 PWSH="${PWSH:-$(command -v pwsh || true)}"
 if [ -n "$PWSH" ]; then

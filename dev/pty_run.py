@@ -9,9 +9,14 @@ as its piped stdin ends.
 """
 import os
 import pty
+import select
+import signal
 import sys
 import termios
 import time
+
+# A prompt nobody answers must fail the run, not hang CI.
+TIMEOUT = float(os.environ.get("PTY_TIMEOUT", "120"))
 
 
 def settle(fd: int) -> None:
@@ -31,14 +36,23 @@ def main() -> int:
     if pid == 0:
         os.execvp(cmd[0], cmd)
     seen = b""
-    deadline = time.monotonic() + 300
-    while time.monotonic() < deadline:
+    deadline = time.monotonic() + TIMEOUT
+    while True:
+        left = deadline - time.monotonic()
+        ready = select.select([fd], [], [], max(left, 0))[0] if left > 0 else []
+        if not ready:
+            os.kill(pid, signal.SIGKILL)
+            os.waitpid(pid, 0)
+            pending = ", ".join(repr(a[0]) for a in answers) or "none"
+            sys.stdout.write(f"\npty_run: no progress for {TIMEOUT:.0f} s; unanswered prompts: {pending}\n")
+            return 124
         try:
             chunk = os.read(fd, 4096)
         except OSError:  # EIO: the child closed the terminal
             break
         if not chunk:
             break
+        deadline = time.monotonic() + TIMEOUT  # any output is progress
         sys.stdout.buffer.write(chunk)
         sys.stdout.buffer.flush()
         seen += chunk
