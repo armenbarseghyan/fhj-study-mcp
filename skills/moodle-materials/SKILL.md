@@ -15,9 +15,9 @@ Reply in the user's language; keep quotes, commands and file names in the origin
 
 ## Search strategy
 
-1. **Search in the material's language.** DAT courses are taught in English, the site is in
-   German, the user may write in any language. Translate the intent into 1–2
-   English keywords (German as a fallback): "wie komme ich von zu Hause auf die VM" → `VM`, `remote`,
+1. **Search in the material's language.** Courses are taught in English or German (course and
+   file names show which), the site is in German, the user may write in any language. Translate
+   the intent into 1–2 keywords in the course's language, then try the other one: "wie komme ich von zu Hause auf die VM" → `VM`, `remote`,
    `ssh`; "exam schedule" → `exam`, `assessment`, `Prüfung`. Every word must match, so keep it
    short.
 2. **Metadata first:** `moodle_search(query)` — module names, file names, descriptions. Fast.

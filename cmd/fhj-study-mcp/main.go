@@ -154,13 +154,14 @@ func serveHTTP(ctx context.Context, srv *mcp.Server, addr, token string, logger 
 
 func newClient(token string, logger *slog.Logger) (*moodle.Client, error) {
 	base := os.Getenv("MOODLE_URL")
+	const fix = " — run ./setup.sh (setup.ps1 on Windows) in the fhj-study-mcp folder, then restart the assistant"
 	switch {
 	case base == "" && token == "":
-		return nil, errors.New("MOODLE_URL and MOODLE_TOKEN are not set")
+		return nil, errors.New("MOODLE_URL and MOODLE_TOKEN are not set" + fix)
 	case base == "":
-		return nil, errors.New("MOODLE_URL is not set")
+		return nil, errors.New("MOODLE_URL is not set" + fix)
 	case token == "":
-		return nil, errors.New("MOODLE_TOKEN is not set")
+		return nil, errors.New("MOODLE_TOKEN is not set" + fix)
 	}
 	return moodle.New(moodle.Config{BaseURL: base, Token: token, Logger: logger})
 }
