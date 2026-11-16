@@ -1,6 +1,6 @@
 # Changelog
 
-## [Unreleased]
+## [0.3.0] — 2026-11-16
 
 ### Added
 - `fhj_timetable`: when and where classes are, from the FH timetable (`almaty.fh-joanneum.at`,
