@@ -19,8 +19,8 @@ You need:
 
 | | |
 |---|---|
-| **Claude Code or Codex** | Claude Code (CLI, desktop app or IDE extension) — [claude.com/claude-code](https://claude.com/claude-code) — or the Codex CLI — [developers.openai.com/codex](https://developers.openai.com/codex). With both installed, the setup connects both |
-| **git** | to get the code (or download the ZIP from GitHub) |
+| **Claude Code or Codex** | Claude Code (CLI, desktop app or IDE extension) — [claude.com/claude-code](https://claude.com/claude-code) — or the Codex CLI — [developers.openai.com/codex](https://developers.openai.com/codex). With both installed, the setup asks which one (or both) |
+| **git** | to get the code (or download the ZIP from GitHub). On a new Mac the first `git` command offers to install Apple's developer tools: accept and run the command again |
 | **Go** | optional (1.21 or newer; it fetches the 1.26 toolchain itself). With Go the server is built from source; without it the setup downloads a prebuilt, checksum-verified binary from the GitHub release |
 | **FH account** | your own FH username and password — every student uses **their own** token |
 
@@ -50,13 +50,24 @@ Works in Windows PowerShell 5.1 (built in) and PowerShell 7.
 
 ### Then
 
-The script asks for your FH username and password **once**, checks everything and registers the
-server. When it prints `Done`, **restart Claude Code / Codex** and ask *"check my moodle connection"*.
+The script asks, in this order: which assistant (only if both are installed), your FH username
+and password (**once**; the password stays invisible while you type), your programme for the
+class timetable and your groups (both optional, see below), and whether to install the skills.
+When it prints `✓ All set.` (Windows: `Done.`), **restart Claude Code / Codex** and ask
+*"check my moodle connection"*.
+
+**Programme and groups for the timetable.** The programme is its short name and the year you
+started, e.g. `dat26` for DAT 2026. To check it, type it into the
+[FH timetable search](https://almaty.fh-joanneum.at/stundenplan/): your classes should show up.
+Groups are written as the timetable writes them (`Gruppe 2`; several with commas; upper/lower
+case does not matter). Classes for the whole year are always shown; leave the groups empty to
+see every group. Press Enter at the programme question to skip the timetable.
 
 | Option | setup.sh | setup.ps1 |
 |---|---|---|
 | already have a token | `MOODLE_TOKEN=<token> ./setup.sh` | `$env:MOODLE_TOKEN = "<token>"` before the run |
-| only Claude Code / only Codex (default: every installed one) | `--claude` / `--codex` | `-Claude` / `-Codex` |
+| only Claude Code / only Codex (default: ask when both are installed) | `--claude` / `--codex` | `-Claude` / `-Codex` |
+| timetable without the questions | `--timetable dat26 --groups "Gruppe 2"` (`--timetable ""` skips it) | `-Timetable dat26 -Groups "Gruppe 2"` |
 | skip the skills | `--no-skills` | `-NoSkills` |
 | install skills without asking | `--skills` | `-Skills` |
 | another Moodle site | `--url https://…` | `-Url https://…` |
@@ -68,7 +79,8 @@ After `git pull`, run it again to get the new version.
 
 ## What the setup does
 
-1. **Checks** which clients are installed (`claude`, `codex`) and, on macOS/Linux, `curl`.
+1. **Checks** which clients are installed (`claude`, `codex`; asks which to set up when both are)
+   and, on macOS/Linux, `curl`.
 2. **Builds** `bin/fhj-study-mcp` with Go — or, without Go, downloads the release binary for
    your system and verifies its SHA-256 checksum before using it.
 3. **Gets your token** from `https://moodle.fh-joanneum.at/login/token.php`, the endpoint the
@@ -77,11 +89,15 @@ After `git pull`, run it again to get the new version.
 4. **Validates the token**: it must be exactly 32 hex characters (see pitfall 4 below).
 5. **Checks it against Moodle** (`core_webservice_get_site_info`) and prints
    `signed in as <your name>`. A bad token stops here, before anything is registered.
-6. **Registers** the server for your user:
+6. **Asks for the timetable** programme and groups (optional) — see *Then* above. They are
+   stored in the registration as `FHJ_TIMETABLE` / `FHJ_TIMETABLE_GROUPS`; the timetable is
+   public and needs no token.
+7. **Registers** the server for your user:
    Claude Code — `claude mcp add fhj --scope user -e MOODLE_URL=… -e MOODLE_TOKEN=… -- <absolute path>`,
    then checks that it connects; Codex — `codex mcp add fhj --env MOODLE_URL=… --env MOODLE_TOKEN=… -- <absolute path>`
-   (written to `~/.codex/config.toml`).
-7. **Links the skills** (asks first) into `~/.claude/skills` for Claude Code and
+   (written to `~/.codex/config.toml`). If an old registration called `moodle` exists (from
+   before the rename), it tells you how to remove it.
+8. **Links the skills** (asks first) into `~/.claude/skills` for Claude Code and
    `~/.agents/skills` for Codex. Skills teach the assistant good
    workflows on top of the tools: briefings, finding material and answering from it with page
    numbers, assignment checklists, grades with feedback, a visual dashboard and self-diagnosis.

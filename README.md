@@ -27,11 +27,13 @@ anything in Moodle. It runs on your own computer, with your own account.
 **You need:** [Claude Code](https://claude.com/claude-code) or the
 [Codex CLI](https://developers.openai.com/codex), [git](https://git-scm.com/downloads), and your
 FH username and password. Go is *not* needed. Without Go, the setup downloads a ready-made,
-checksum-verified program.
+checksum-verified program. On a new Mac, the first `git` command offers to install Apple's
+developer tools: accept, wait until it finishes, then run the command again.
 
 ### macOS / Linux
 
-Open a terminal and run:
+Open the **Terminal** app (macOS: <kbd>⌘</kbd> + <kbd>Space</kbd>, type *Terminal*, Enter) and run
+these two commands, one after the other:
 
 ```bash
 git clone https://github.com/armenbarseghyan/fhj-study-mcp.git
@@ -43,7 +45,7 @@ cd fhj-study-mcp && ./setup.sh
 
 ### Windows
 
-Open **PowerShell** and run:
+Open **PowerShell** (Start menu → type *PowerShell*) and run:
 
 ```powershell
 git clone https://github.com/armenbarseghyan/fhj-study-mcp.git
@@ -51,19 +53,25 @@ cd fhj-study-mcp
 powershell -ExecutionPolicy Bypass -File .\setup.ps1
 ```
 
-### Then
+### Then the script asks, in this order
 
-1. The script asks for your **FH username and password once**. They go only to
-   `moodle.fh-joanneum.at` and are not saved anywhere.
-2. It asks which assistant to set up (if you have both), your programme for the class
-   timetable (e.g. `dat26`, Enter to skip) and, optionally, your groups (`Gruppe 2`).
-   Answer **Y** when it offers to install the skills (recommended).
-3. When it prints `Done`, **restart Claude Code / Codex** and ask:
-   *"check my moodle connection"*.
+1. **Which assistant** to set up — only if both Claude Code and Codex are installed.
+2. Your **FH username and password**, once. They go only to `moodle.fh-joanneum.at` and are
+   not saved anywhere. The password stays invisible while you type; that is normal.
+3. Your **programme for the class timetable**: the programme's short name and the year you
+   started, e.g. `dat26`. Not sure? Type it into the
+   [FH timetable search](https://almaty.fh-joanneum.at/stundenplan/): if your classes show up, it
+   is right. Press Enter to skip.
+4. Optionally your **groups**, as the timetable writes them (`Gruppe 2`; several with commas).
+   Press Enter to see the classes of all groups.
+5. Whether to install the **skills**: answer **Y** (recommended).
 
-The script connects every client it finds. Use `--claude` or `--codex` (`-Claude` / `-Codex`
-on Windows) to pick one. Want the details of each step, the manual way, or help with an
-error? → **[Setup guide](docs/STUDENT-SETUP.md)**.
+When it prints **`✓ All set.`** (Windows: `Done.`), **restart Claude Code / Codex** and ask:
+*"check my moodle connection"*, then *"when are my classes this week?"*.
+
+You can also give the answers up front, e.g. `./setup.sh --claude --timetable dat26 --groups "Gruppe 2"`
+(Windows: `-Claude -Timetable dat26 -Groups "Gruppe 2"`); then the script only asks for your login.
+Details of each step, the manual way and help with errors: **[Setup guide](docs/STUDENT-SETUP.md)**.
 
 ### First thing to try
 
